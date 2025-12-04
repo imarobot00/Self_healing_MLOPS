@@ -121,7 +121,7 @@ self-healing-air-quality/
 
 ---
 
-## 📌 Features Roadmap
+##  Features Roadmap
 
 * [x] Architecture design
 * [ ] Baseline prediction model
@@ -134,7 +134,7 @@ self-healing-air-quality/
 * [ ] Alerts system
 
 
-## 🙌 Author
+##  Author
 
 Bipul Dahal — Final-year engineering student building full-stack AI/MLOps systems.
 
