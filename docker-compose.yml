@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  data-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openaq-data-pipeline
+    restart: unless-stopped
+    
+    environment:
+      - OPENAQ_API_KEY=${OPENAQ_API_KEY:-}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+    
+    volumes:
+      # Persist data files
+      - ./dataset:/app/data
+      # Persist logs
+      - ./logs:/app/logs
+      # Mount config (optional override)
+      - ./dataset/config.yaml:/app/config.yaml:ro
+    
+    networks:
+      - pipeline-network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  pipeline-network:
+    driver: bridge

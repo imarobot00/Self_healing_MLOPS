@@ -1,0 +1,146 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+dataset/pipeline.log
+dataset/metrics.json
+
+# Data Files (Large JSON files - optional, uncomment to ignore)
+# dataset/location_*.json
+# dataset/*.json
+
+# State Files (Keep these in git for continuity)
+# dataset/.state.json
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.cover
+*.py,cover
+.hypothesis/
+
+# Docker
+.dockerignore
+
+# OS
+Thumbs.db
+.DS_Store
+*.bak
+*.tmp
+
+# Backup files
+*.backup
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Model artifacts (when you add ML models later)
+models/*.pkl
+models/*.h5
+models/*.pth
+models/*.onnx
+*.model
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# CI/CD
+.github/workflows/*.log
+
+# Secrets and credentials (IMPORTANT!)
+**/secrets/
+**/*secret*
+**/*credential*
+**/*password*
+**/config/production.yaml
+dataset/.env
+
+# Large data directories (optional)
+# data/raw/
+# data/processed/
+
+# Monitoring and metrics (generated files)
+dataset/metrics.json
+dataset/validation_report.txt
+
+# Cache
+.cache/
+*.cache
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Profiling
+*.prof
+*.lprof
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*

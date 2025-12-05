@@ -1,0 +1,114 @@
+name: Data Pipeline - Scheduled Run
+
+on:
+  # Schedule: Run every 2 hours
+  schedule:
+    - cron: '0 */2 * * *'  # At minute 0 of every 2nd hour
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      reset_state:
+        description: 'Reset state and fetch all data'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd dataset
+          pip install -r requirements.txt
+      
+      - name: Restore state from cache
+        if: ${{ !inputs.reset_state }}
+        uses: actions/cache/restore@v3
+        with:
+          path: dataset/.state.json
+          key: pipeline-state-${{ github.run_id }}
+          restore-keys: |
+            pipeline-state-
+      
+      - name: Run incremental data loader
+        env:
+          OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          cd dataset
+          if [ "${{ inputs.reset_state }}" = "true" ]; then
+            echo "Resetting state..."
+            rm -f .state.json
+          fi
+          python incremental_loader.py --locations 3459 6093549 6093550 6093551 6093552 6093553 6093554 6093555 6093556
+      
+      - name: Validate data quality
+        run: |
+          cd dataset
+          # Validate the first location as a sample
+          python validator.py --file location_3459.json --sample 1000 || true
+      
+      - name: Save state to cache
+        uses: actions/cache/save@v3
+        with:
+          path: dataset/.state.json
+          key: pipeline-state-${{ github.run_id }}
+      
+      - name: Commit and push updated data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add dataset/*.json dataset/.state.json
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update data from scheduled pipeline run [skip ci]"
+            git push
+          fi
+      
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: pipeline-logs-${{ github.run_number }}
+          path: |
+            dataset/pipeline.log
+            dataset/metrics.json
+          retention-days: 7
+      
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "❌ Data Pipeline Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Data Pipeline Failure*\n\nWorkflow: ${{ github.workflow }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>\nBranch: ${{ github.ref_name }}"
+                  }
+                }
+              ]
+            }
+        continue-on-error: true
