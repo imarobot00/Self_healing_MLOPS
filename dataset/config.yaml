@@ -1,0 +1,104 @@
+# Data Pipeline Configuration
+
+# OpenAQ location IDs to monitor
+locations:
+  - 3459      # Primary location
+  - 6093549   # Additional locations
+  - 6093550
+  - 6093551
+  - 6093552
+  - 6093553
+  - 6093554
+  - 6093555
+  - 6093556
+
+# Scheduling configuration
+schedule:
+  interval_hours: 2  # Fetch data every 2 hours
+  timezone: "UTC"
+  
+# API configuration
+api:
+  base_url: "https://api.openaq.org/v3"
+  timeout_seconds: 30
+  rate_limit_delay: 0.2  # Delay between requests (seconds)
+  max_retries: 3
+  retry_delay: 5  # Initial retry delay (seconds, exponential backoff)
+
+# Data configuration
+data:
+  output_directory: "."  # Relative to dataset/ folder
+  file_pattern: "location_{location_id}.json"
+  state_file: ".state.json"
+  backup_enabled: false
+  backup_directory: "backups"
+
+# Validation rules
+validation:
+  enabled: true
+  
+  # Parameter ranges (min, max) in their respective units
+  parameter_ranges:
+    pm1: [0, 1000]      # µg/m³
+    pm25: [0, 1000]     # µg/m³
+    pm10: [0, 2000]     # µg/m³
+    o3: [0, 500]        # µg/m³
+    no2: [0, 500]       # µg/m³
+    so2: [0, 500]       # µg/m³
+    co: [0, 50000]      # µg/m³
+    temperature: [-50, 60]  # °C
+    humidity: [0, 100]  # %
+    pressure: [800, 1100]  # hPa
+  
+  # Required fields in measurement records
+  required_fields:
+    - "value"
+    - "parameter"
+    - "period"
+    - "locationId"
+
+# Monitoring and logging
+monitoring:
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "pipeline.log"
+  log_rotation: "1 day"
+  log_retention: "30 days"
+  
+  # Metrics to track
+  metrics:
+    - records_fetched
+    - records_deduplicated
+    - api_response_time
+    - pipeline_duration
+    - errors_count
+  
+  # Alert thresholds
+  alerts:
+    max_consecutive_failures: 3
+    min_records_per_location: 1
+    max_api_response_time: 60  # seconds
+
+# Notifications (optional)
+notifications:
+  enabled: false
+  
+  # Email notifications
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    from_address: "alerts@example.com"
+    to_addresses:
+      - "admin@example.com"
+    
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ""  # Set via environment variable SLACK_WEBHOOK_URL
+    channel: "#data-pipeline-alerts"
+  
+  # Webhook notifications
+  webhook:
+    enabled: false
+    url: ""  # Set via environment variable WEBHOOK_URL
+    method: "POST"
