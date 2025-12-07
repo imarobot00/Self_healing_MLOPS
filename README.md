@@ -243,18 +243,26 @@ Self_healing_MLOPS/
 ┌─────────────┐
 │  OpenAQ API │  (Global air quality sensors)
 └──────┬──────┘
-       │ HTTPS REST API
+       │ HTTPS REST API (Sensor-based)
        ↓
 ┌──────────────────┐
-│ Incremental      │  Every 2 hours
-│ Loader           │  - Fetches new data only
-│                  │  - Pagination handling
+│ Step 1:          │  GET /locations/{id}
+│ Get Location     │  - Retrieve location details
+│                  │  - Extract sensor IDs
 └────────┬─────────┘
          │
          ↓
 ┌──────────────────┐
-│  Deduplicator    │  Removes duplicates
-│                  │  (composite key matching)
+│ Step 2:          │  For each sensor:
+│ Query Sensors    │  GET /sensors/{sensor_id}/measurements
+│                  │  - PM1, PM2.5, temp, humidity, etc.
+│                  │  - With date_from filter (incremental)
+└────────┬─────────┘
+         │
+         ↓
+┌──────────────────┐
+│ Step 3:          │  Removes duplicates
+│ Deduplicator     │  (composite key matching)
 └────────┬─────────┘
          │
          ↓

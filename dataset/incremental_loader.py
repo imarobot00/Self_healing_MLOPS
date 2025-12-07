@@ -95,48 +95,79 @@ class IncrementalLoader:
         print(f"Fetching measurements for location {location_id}" + 
               (f" since {since}" if since else " (all available data)"))
 
+        # First, get the location to find its sensors
         try:
-            while True:
-                url = f"{API_BASE}/measurements"
-                params = {
-                    "limit": limit,
-                    "page": page,
-                    "location_id": location_id,
-                    "order_by": "datetime",
-                    "sort_order": "asc"
-                }
+            loc_url = f"{API_BASE}/locations/{location_id}"
+            loc_resp = requests.get(loc_url, headers=self.headers, timeout=15)
+            loc_resp.raise_for_status()
+            loc_data = loc_resp.json().get("results") or []
+            
+            if not loc_data:
+                print(f"  Location {location_id} not found")
+                return all_results
+            
+            location = loc_data[0]
+            sensors = location.get("sensors") or []
+            
+            if not sensors:
+                print(f"  No sensors found for location {location_id}")
+                return all_results
+            
+            print(f"  Found {len(sensors)} sensors for location")
+            
+            # Fetch measurements from each sensor
+            for sensor in sensors:
+                sensor_id = sensor.get("id")
+                if not sensor_id:
+                    continue
                 
-                # Add date_from filter if we have a since timestamp
-                if since:
-                    params["date_from"] = since
+                parameter_name = sensor.get("parameter", {}).get("name", "unknown")
+                print(f"  Fetching {parameter_name} data from sensor {sensor_id}...")
                 
-                resp = requests.get(url, params=params, headers=self.headers, timeout=30)
-                resp.raise_for_status()
-                data = resp.json()
-
-                results = data.get("results") or []
-                if not results:
-                    break
-
-                all_results.extend(results)
-                print(f"  Fetched page {page}: {len(results)} records")
-
-                # Check if there are more pages
-                if len(results) < limit:
-                    break
-
-                page += 1
-                time.sleep(0.2)  # Rate limiting
+                page = 1
+                while True:
+                    url = f"{API_BASE}/sensors/{sensor_id}/measurements"
+                    params = {"limit": limit, "page": page}
+                    
+                    # Add date_from filter if we have a since timestamp
+                    if since:
+                        params["date_from"] = since
+                    
+                    try:
+                        resp = requests.get(url, params=params, headers=self.headers, timeout=30)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        
+                        results = data.get("results") or []
+                        if not results:
+                            break
+                        
+                        all_results.extend(results)
+                        
+                        # Check if there are more pages
+                        if len(results) < limit:
+                            break
+                        
+                        page += 1
+                        time.sleep(0.2)  # Rate limiting
+                        
+                    except requests.HTTPError as e:
+                        print(f"    HTTP error for sensor {sensor_id}: {e}")
+                        break
+                    except Exception as e:
+                        print(f"    Error for sensor {sensor_id}: {e}")
+                        break
+            
+            if all_results:
+                print(f"  Total fetched: {len(all_results)} records from {len(sensors)} sensors")
+            else:
+                print(f"  No new measurements found")
 
         except requests.HTTPError as e:
-            print(f"HTTP error while fetching data: {e}")
-            if all_results:
-                print(f"Returning {len(all_results)} records fetched before error")
+            print(f"HTTP error while fetching location: {e}")
             return all_results
         except Exception as e:
             print(f"Error while fetching data: {e}")
-            if all_results:
-                print(f"Returning {len(all_results)} records fetched before error")
             return all_results
 
         return all_results

@@ -46,13 +46,14 @@
 
 ### 1.2 What It Measures
 
-From each location, every few minutes:
-- **PM2.5** - Fine particulate matter (air pollution)
-- **PM10** - Larger particulate matter
-- **Temperature** - Ambient temperature
-- **Humidity** - Relative humidity
-- **Pressure** - Atmospheric pressure
-- **CO2** - Carbon dioxide levels
+From each location, every hour (5 sensors per location):
+- **PM1** - Ultra-fine particulate matter (< 1 μm)
+- **PM2.5** - Fine particulate matter (air pollution indicator)
+- **Temperature** - Ambient temperature in °C
+- **Relative Humidity** - Moisture level (%)
+- **UM003** - Ultrafine particle count (particles/cm³)
+
+**Each location = 5 sensors = 5 data streams combined**
 
 ### 1.3 Why This Matters
 
@@ -176,27 +177,42 @@ $ cat dataset/.state.json
 You (your code) → Ask waiter (API) → Kitchen (OpenAQ servers) → Food (data)
 ```
 
-**Your actual API request:**
+**Your actual API request (Sensor-based approach):**
 ```python
-# What your code does:
+# Step 1: Get location to find sensors
 response = requests.get(
-    "https://api.openaq.org/v3/measurements",
-    headers={"X-API-Key": "your_secret_key"},
-    params={
-        "location_id": 6142174,  # Ranibari
-        "date_from": "2025-12-07T00:00:00Z"
-    }
+    "https://api.openaq.org/v3/locations/6142174",
+    headers={"X-API-Key": "your_secret_key"}
 )
+location = response.json()["results"][0]
+sensors = location["sensors"]  # 5 sensors: PM1, PM2.5, temp, humidity, particles
 
-# API returns:
-{
-  "results": [
-    {"value": 45.3, "parameter": "pm25", "location": "Ranibari"},
-    {"value": 46.1, "parameter": "pm25", "location": "Ranibari"},
-    ...
-  ]
-}
+# Step 2: Fetch from each sensor
+for sensor in sensors:
+    sensor_id = sensor["id"]  # e.g., 14720442
+    parameter = sensor["parameter"]["name"]  # e.g., "pm25"
+    
+    response = requests.get(
+        f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements",
+        headers={"X-API-Key": "your_secret_key"},
+        params={"date_from": "2025-12-07T00:00:00Z"}
+    )
+    
+    # API returns measurements for that specific sensor:
+    {
+      "results": [
+        {"value": 45.3, "parameter": "pm25", "sensorId": 14720442},
+        {"value": 46.1, "parameter": "pm25", "sensorId": 14720442},
+        ...
+      ]
+    }
 ```
+
+**Why this approach?**
+- OpenAQ API v3 changed from location-based to sensor-based queries
+- Each location has multiple sensors (5+ different parameters)
+- More granular control over what data to fetch
+- Can handle different sensor types independently
 
 **Why use an API?**
 - ✅ Always fresh data (real-time)
@@ -491,6 +507,42 @@ validation:
 ---
 
 ## 5. Your System Architecture
+
+### 5.0 How Sensor Discovery Works
+
+**Real example from your Ranibari location (6142174):**
+
+```python
+# Step 1: Query location
+GET https://api.openaq.org/v3/locations/6142174
+
+# Response shows 5 sensors:
+{
+  "results": [{
+    "id": 6142174,
+    "name": "Ranibari (SC-43)-GD Labs",
+    "sensors": [
+      {"id": 14720441, "parameter": {"name": "pm1"}},
+      {"id": 14720442, "parameter": {"name": "pm25"}},
+      {"id": 14720443, "parameter": {"name": "relativehumidity"}},
+      {"id": 14720444, "parameter": {"name": "temperature"}},
+      {"id": 14720445, "parameter": {"name": "um003"}}
+    ]
+  }]
+}
+
+# Step 2: Fetch from each sensor
+GET /sensors/14720441/measurements  # PM1 data
+GET /sensors/14720442/measurements  # PM2.5 data
+GET /sensors/14720443/measurements  # Humidity data
+GET /sensors/14720444/measurements  # Temperature data
+GET /sensors/14720445/measurements  # Particle count data
+
+# Step 3: Combine all sensor data
+# Result: Complete air quality profile for Ranibari
+```
+
+**This is why your pipeline fetches 1000+ records per location** - it's actually fetching from 5 different sensors!
 
 ### 5.1 File Structure
 

@@ -2,25 +2,33 @@
 
 ## ✅ What Was Built
 
-A complete, production-ready automated data pipeline that fetches OpenAQ air quality measurements every 2 hours with incremental loading, validation, and monitoring.
+A complete, production-ready automated data pipeline that fetches OpenAQ air quality measurements every 2 hours with **sensor-based API queries**, incremental loading, validation, and monitoring.
+
+**Key Architecture: Sensor-Based Fetching**
+- OpenAQ API v3 requires querying individual sensors rather than direct location endpoints
+- Each location has 5+ sensors (PM1, PM2.5, temperature, humidity, particle count)
+- Pipeline queries each sensor separately and aggregates results
+- This enables granular control and handles different sensor types independently
 
 ## 📦 Components Created
 
 ### Core Pipeline Modules (dataset/)
 
 1. **`incremental_loader.py`** (380 lines)
-   - Incremental data fetching with state tracking
+   - **Sensor-based API fetching**: Queries `/locations/{id}` then `/sensors/{sensor_id}/measurements`
+   - Incremental data fetching with state tracking (date_from parameter)
    - Deduplication using unique record keys
    - Automatic recovery from API errors
    - Merges new data with existing JSON files
    - Tracks last fetch timestamp per location
 
-2. **`scheduler.py`** (280 lines)
+2. **`scheduler.py`** (310 lines)
    - APScheduler integration (interval & cron modes)
    - Graceful shutdown handling
    - Consecutive failure tracking
    - Automatic validation after each run
    - Metrics recording and alerting
+   - Fixed path handling for Docker volumes (/app/data)
 
 3. **`validator.py`** (320 lines)
    - Schema validation (required fields)

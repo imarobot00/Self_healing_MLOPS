@@ -1,5 +1,7 @@
 # Data Pipeline - Command Cheat Sheet
 
+> **Note:** This pipeline uses OpenAQ API v3 with sensor-based queries. Each location has 5+ sensors (PM1, PM2.5, temperature, humidity, particle count) that are queried individually.
+
 ## 🚀 Quick Start
 
 ```bash
