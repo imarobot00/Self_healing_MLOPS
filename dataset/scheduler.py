@@ -6,6 +6,7 @@ Runs the incremental data loader at configured intervals using APScheduler.
 Supports both interval-based and cron-based scheduling.
 """
 import argparse
+import os
 import signal
 import sys
 from datetime import datetime
@@ -84,7 +85,9 @@ class PipelineScheduler:
             api_config = self.config.get("api", {})
             data_config = self.config.get("data", {})
             
-            loader = IncrementalLoader()
+            # Set data directory (use /app/data in Docker, current dir otherwise)
+            data_dir = Path(os.getenv("DATA_DIR", "/app/data")) if os.path.exists("/app/data") else Path(__file__).parent
+            loader = IncrementalLoader(data_dir=data_dir)
             
             # Run the pipeline
             start_time = datetime.utcnow()

@@ -1,16 +1,17 @@
 # Data Pipeline Configuration
 
-# OpenAQ location IDs to monitor
+# OpenAQ location IDs to monitor (Kathmandu Metropolitan City)
 locations:
-  - 3459      # Primary location
-  - 6093549   # Additional locations
+  - 6142174  # Ranibari, Kathmandu
+  - 6093549  # Golfutar, Kathmandu
   - 6093550
   - 6093551
-  - 6093552
-  - 6093553
-  - 6093554
-  - 6093555
-  - 6093556
+  - 6142022
+  - 6142175
+  - 6133623
+  - 5506835
+  - 5509787
+  - 3459
 
 # Scheduling configuration
 schedule:
