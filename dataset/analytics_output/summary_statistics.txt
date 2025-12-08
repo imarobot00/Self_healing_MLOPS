@@ -1,0 +1,123 @@
+================================================================================
+AIR QUALITY DATA ANALYTICS SUMMARY
+================================================================================
+
+Generated: 2025-12-08 11:38:07
+Total Records: 37,155
+Date Range: 2025-09-19 04:45:00+05:45 to 2025-12-08 05:45:00+05:45
+Output Directory: /home/bipul/Bipul/Self Healing MLOps/dataset/analytics_output
+
+================================================================================
+
+PARAMETER STATISTICS
+--------------------------------------------------------------------------------
+
+PM1 (µg/m³):
+  Count:   7,431
+  Mean:    34.64
+  Median:  30.96
+  Min:     0.00
+  Max:     161.17
+  Std Dev: 19.25
+
+PM25 (µg/m³):
+  Count:   7,431
+  Mean:    55.80
+  Median:  48.79
+  Min:     0.00
+  Max:     295.55
+  Std Dev: 31.63
+
+RELATIVEHUMIDITY (%):
+  Count:   7,431
+  Mean:    43.74
+  Median:  43.97
+  Min:     17.57
+  Max:     76.19
+  Std Dev: 7.56
+
+TEMPERATURE (c):
+  Count:   7,431
+  Mean:    22.99
+  Median:  22.71
+  Min:     13.60
+  Max:     37.75
+  Std Dev: 3.82
+
+UM003 (particles/cm³):
+  Count:   7,431
+  Mean:    2474.90
+  Median:  2155.94
+  Min:     70.89
+  Max:     12077.58
+  Std Dev: 1506.14
+
+================================================================================
+
+LOCATION STATISTICS
+--------------------------------------------------------------------------------
+
+Location 5506835 (ID: 5506835):
+  Total Records: 9,415
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-09-19 04:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 59.25 µg/m³
+  PM2.5 Max:  295.55 µg/m³
+
+Location 5509787 (ID: 5509787):
+  Total Records: 5,545
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-09-25 11:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 41.33 µg/m³
+  PM2.5 Max:  265.69 µg/m³
+
+Golfutar (ID: 6093549):
+  Total Records: 6,545
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-10-13 11:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 48.16 µg/m³
+  PM2.5 Max:  191.55 µg/m³
+
+Location 6093550 (ID: 6093550):
+  Total Records: 5,070
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-10-13 11:45:00+05:45 to 2025-12-07 22:45:00+05:45
+  PM2.5 Mean: 51.53 µg/m³
+  PM2.5 Max:  200.02 µg/m³
+
+Location 6093551 (ID: 6093551):
+  Total Records: 4,865
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-10-19 13:45:00+05:45 to 2025-12-08 04:45:00+05:45
+  PM2.5 Mean: 58.02 µg/m³
+  PM2.5 Max:  197.78 µg/m³
+
+Location 6133623 (ID: 6133623):
+  Total Records: 2,445
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-11-17 14:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 72.22 µg/m³
+  PM2.5 Max:  262.00 µg/m³
+
+Location 6142022 (ID: 6142022):
+  Total Records: 1,520
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-11-25 13:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 75.51 µg/m³
+  PM2.5 Max:  167.33 µg/m³
+
+Ranibari (SC-43 GD Labs) (ID: 6142174):
+  Total Records: 1,300
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-11-25 15:45:00+05:45 to 2025-12-08 05:45:00+05:45
+  PM2.5 Mean: 78.14 µg/m³
+  PM2.5 Max:  173.24 µg/m³
+
+Location 6142175 (ID: 6142175):
+  Total Records: 450
+  Parameters: pm1, pm25, relativehumidity, temperature, um003
+  Date Range: 2025-11-25 14:45:00+05:45 to 2025-11-29 08:45:00+05:45
+  PM2.5 Mean: 77.33 µg/m³
+  PM2.5 Max:  165.19 µg/m³
+
+================================================================================
