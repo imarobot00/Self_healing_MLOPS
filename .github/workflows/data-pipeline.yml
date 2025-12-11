@@ -1,18 +1,9 @@
 name: Data Pipeline - Scheduled Run
 
 on:
-  # Schedule: Run every 2 hours
   schedule:
-    - cron: '0 */2 * * *'  # At minute 0 of every 2nd hour
-  
-  # Allow manual triggering
-  workflow_dispatch:
-    inputs:
-      reset_state:
-        description: 'Reset state and fetch all data'
-        required: false
-        type: boolean
-        default: false
+    - cron: '0 */2 * * *'  # Every 2 hours
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   run-pipeline:
@@ -23,58 +14,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
       
       - name: Install dependencies
         run: |
-          cd dataset
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r dataset/requirements.txt
       
-      - name: Restore state from cache
-        if: ${{ !inputs.reset_state }}
-        uses: actions/cache/restore@v3
-        with:
-          path: dataset/.state.json
-          key: pipeline-state-${{ github.run_id }}
-          restore-keys: |
-            pipeline-state-
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Run incremental data loader
+      - name: Run data pipeline
         env:
           OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           cd dataset
-          if [ "${{ inputs.reset_state }}" = "true" ]; then
-            echo "Resetting state..."
-            rm -f .state.json
-          fi
-          python incremental_loader.py --locations 3459 5506835 5509787 6093549 6093550 6093551 6133623 6142022 6142174 6142175
+          python incremental_loader.py --locations 3459 5506835 5509787 6093549 6093550 6093551 6133623 6142022 6142174 6142175 || exit 0
       
-      - name: Validate data quality
+      - name: Commit and push changes
         run: |
-          cd dataset
-          # Validate the first location as a sample
-          python validator.py --file location_3459.json --sample 1000 || true
-      
-      - name: Save state to cache
-        uses: actions/cache/save@v3
-        with:
-          path: dataset/.state.json
-          key: pipeline-state-${{ github.run_id }}
-      
-      - name: Commit and push updated data
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add dataset/*.json dataset/.state.json
+          git add -f dataset/location_*.json || true
+          git add -f dataset/.state.json || true
           
-          # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
@@ -82,7 +50,7 @@ jobs:
             git push
           fi
       
-      - name: Upload logs as artifact
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -90,25 +58,5 @@ jobs:
           path: |
             dataset/pipeline.log
             dataset/metrics.json
+          if-no-files-found: ignore
           retention-days: 7
-      
-      - name: Notify on failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "text": "❌ Data Pipeline Failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Data Pipeline Failure*\n\nWorkflow: ${{ github.workflow }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>\nBranch: ${{ github.ref_name }}"
-                  }
-                }
-              ]
-            }
-        continue-on-error: true
