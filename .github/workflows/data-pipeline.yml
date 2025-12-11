@@ -54,7 +54,7 @@ jobs:
             echo "Resetting state..."
             rm -f .state.json
           fi
-          python incremental_loader.py --locations 3459 6093549 6093550 6093551 6093552 6093553 6093554 6093555 6093556
+          python incremental_loader.py --locations 3459 5506835 5509787 6093549 6093550 6093551 6133623 6142022 6142174 6142175
       
       - name: Validate data quality
         run: |
