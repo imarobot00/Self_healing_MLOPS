@@ -561,15 +561,6 @@ After running for 1 week, you should have:
 This is a personal project, but feel free to:
 - Open issues for bugs
 - Suggest improvements
-- Fork and extend for your use case
-
----
-
-## 📝 License
-
-MIT License - feel free to use for learning and personal projects.
-
----
 
 ## 👤 Author
 
