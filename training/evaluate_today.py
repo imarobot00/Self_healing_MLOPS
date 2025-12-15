@@ -32,10 +32,15 @@ sys.path.insert(0, str(preprocessed_dir))
 
 # Import preprocessing module
 try:
-    from preprocessing import StreamingPreprocessor
-except ImportError:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("preprocessing", preprocessed_dir / "preprocessing.py")
+    preprocessing_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(preprocessing_module)
+    StreamingPreprocessor = preprocessing_module.StreamingPreprocessor
+except (ImportError, FileNotFoundError, AttributeError) as e:
     print(f"Error: Could not import StreamingPreprocessor from {preprocessed_dir}")
     print(f"Make sure preprocessing.py exists in: {preprocessed_dir}")
+    print(f"Error details: {e}")
     sys.exit(1)
 
 # Set style
@@ -258,34 +263,68 @@ class TodayEvaluator:
             features = {col: row[col] for col in feature_cols}
             
             # Make prediction
-            y_pred = self.model.predict_one(features)
-            y_true = row['aqi']
-            
-            if y_pred is not None and not pd.isna(y_true):
-                predictions.append(y_pred)
-                actuals.append(y_true)
-                timestamps.append(row['datetime'])
-                location_ids.append(row['location_id'])
+            try:
+                y_pred = self.model.predict_one(features)
+                y_true = row['aqi']
+                
+                if y_pred is not None and not pd.isna(y_true):
+                    predictions.append(y_pred)
+                    actuals.append(y_true)
+                    timestamps.append(row['datetime'])
+                    location_ids.append(row['location_id'])
+            except Exception as e:
+                # Skip rows that cause prediction errors
+                continue
         
         print(f"✅ Generated {len(predictions)} predictions")
+        
+        # Check if we have valid predictions
+        if len(predictions) == 0:
+            print("⚠️  WARNING: No valid predictions were generated!")
+            return {
+                'predictions': [],
+                'actuals': [],
+                'residuals': [],
+                'timestamps': [],
+                'location_ids': [],
+                'metrics': {
+                    'mae': 0.0,
+                    'rmse': 0.0,
+                    'r2': 0.0,
+                    'mape': 0.0,
+                    'count': 0
+                }
+            }
         
         # Calculate metrics
         predictions_array = np.array(predictions)
         actuals_array = np.array(actuals)
         
-        mae = np.mean(np.abs(actuals_array - predictions_array))
-        rmse = np.sqrt(np.mean((actuals_array - predictions_array)**2))
+        # Remove NaN values from both arrays
+        valid_mask = ~(np.isnan(predictions_array) | np.isnan(actuals_array))
+        predictions_clean = predictions_array[valid_mask]
+        actuals_clean = actuals_array[valid_mask]
         
-        ss_res = np.sum((actuals_array - predictions_array)**2)
-        ss_tot = np.sum((actuals_array - np.mean(actuals_array))**2)
-        r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-        
-        mape_values = [
-            abs((actuals[i] - predictions[i]) / actuals[i]) * 100
-            for i in range(len(actuals))
-            if actuals[i] != 0
-        ]
-        mape = np.mean(mape_values) if mape_values else 0
+        if len(predictions_clean) == 0:
+            print("⚠️  WARNING: No valid predictions after cleaning!")
+            mae = 0.0
+            rmse = 0.0
+            r2 = 0.0
+            mape = 0.0
+        else:
+            mae = float(np.mean(np.abs(actuals_clean - predictions_clean)))
+            rmse = float(np.sqrt(np.mean((actuals_clean - predictions_clean)**2)))
+            
+            ss_res = np.sum((actuals_clean - predictions_clean)**2)
+            ss_tot = np.sum((actuals_clean - np.mean(actuals_clean))**2)
+            r2 = float(1 - (ss_res / ss_tot)) if ss_tot != 0 else 0.0
+            
+            mape_values = [
+                abs((actuals_clean[i] - predictions_clean[i]) / actuals_clean[i]) * 100
+                for i in range(len(actuals_clean))
+                if actuals_clean[i] != 0
+            ]
+            mape = float(np.mean(mape_values)) if mape_values else 0.0
         
         residuals = actuals_array - predictions_array
         
@@ -476,6 +515,11 @@ class TodayEvaluator:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         
+        # Check if we have valid results
+        if len(results['predictions']) == 0:
+            print("⚠️  No predictions to save!")
+            return
+        
         # Save predictions
         df_results = pd.DataFrame({
             'timestamp': results['timestamps'],
@@ -492,18 +536,25 @@ class TodayEvaluator:
         
         # Save metrics
         metrics_file = output_dir / f"today_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        metrics = results['metrics']
         with open(metrics_file, 'w') as f:
             json.dump({
                 'date': '2025-12-15',
-                'metrics': results['metrics'],
+                'metrics': {
+                    'mae': float(metrics['mae']),
+                    'rmse': float(metrics['rmse']),
+                    'r2': float(metrics['r2']),
+                    'mape': float(metrics['mape']),
+                    'count': int(metrics['count'])
+                },
                 'comparison': {
                     'training_mae': 6.74,
                     'test_mae': 4.31,
-                    'today_mae': results['metrics']['mae'],
-                    'vs_training': results['metrics']['mae'] - 6.74,
-                    'vs_test': results['metrics']['mae'] - 4.31
+                    'today_mae': float(metrics['mae']),
+                    'vs_training': float(metrics['mae'] - 6.74),
+                    'vs_test': float(metrics['mae'] - 4.31)
                 }
-            }, f, indent=2, default=str)
+            }, f, indent=2)
         print(f"💾 Metrics saved to: {metrics_file}")
 
 
