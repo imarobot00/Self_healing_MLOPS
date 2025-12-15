@@ -71,18 +71,29 @@ class StreamingTrainer:
         self.max_depth = max_depth
         self.seed = seed
         
-        # Initialize drift detector
+        # Initialize drift detector (more sensitive to allow faster adaptation)
         if drift_detector is None:
-            self.drift_detector = drift.ADWIN(delta=0.002)
+            self.drift_detector = drift.ADWIN(delta=0.01)  # Increased from 0.002 for less conservative drift detection
         else:
             self.drift_detector = drift_detector
         
-        # Initialize Adaptive Random Forest
+        # Initialize warning detector (less sensitive)
+        self.warning_detector = drift.ADWIN(delta=0.05)  # Higher threshold for warnings
+        
+        # Initialize Adaptive Random Forest with balanced settings
         self.model = forest.ARFRegressor(
             n_models=n_models,
             max_depth=max_depth,
             seed=seed,
-            drift_detector=self.drift_detector
+            drift_detector=self.drift_detector,
+            warning_detector=self.warning_detector,
+            grace_period=25,  # Balanced value - not too conservative, not too aggressive
+            lambda_value=6,   # Default - controls Poisson distribution for bagging
+            max_features='sqrt',  # Use sqrt(n_features) for each split
+            aggregation_method='median',  # Use median instead of mean for robustness
+            disable_weighted_vote=True,  # Disable weighting for simpler behavior
+            leaf_prediction='adaptive',  # Use adaptive leaf prediction
+            min_samples_split=5  # Minimum 5 samples to split (default)
         )
         
         # Metrics tracking

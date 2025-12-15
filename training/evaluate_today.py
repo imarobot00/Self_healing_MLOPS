@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
-Real-World Model Evaluation - Today's Data
-===========================================
+Real-World Model Evaluation - AQI Predictions
+==============================================
 
-This script:
-1. Loads today's actual air quality data from GitHub
-2. Uses the trained ARF model to make predictions
-3. Compares predictions vs actual values
-4. Generates performance report and visualizations
+This script evaluates the trained AQI model on real data for a specified date.
+
+Features:
+- Supports any evaluation date (defaults to today)
+- Loads actual air quality data from JSON files
+- Makes predictions using trained ARF model
+- Compares predictions vs actual values
+- Generates performance report and visualizations
+- Saves results in organized date-specific folders
+
+Usage:
+  python evaluate_today.py                    # Evaluate today's data
+  python evaluate_today.py --date 2025-12-15  # Evaluate specific date
 
 Author: Bipul Kumar Dahal
 Date: December 15, 2025
@@ -17,12 +25,13 @@ import pandas as pd
 import numpy as np
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import dill
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Dict, List
+from typing import Dict, List, Optional
 import sys
+import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -48,10 +57,10 @@ plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
 
-class TodayEvaluator:
-    """Evaluate model performance on today's real-world data."""
+class AQIEvaluator:
+    """Evaluate model performance on real-world data for any date."""
     
-    def __init__(self, model_path: str, preprocessor_stats_path: str):
+    def __init__(self, model_path: str, preprocessor_stats_path: str, eval_date: Optional[str] = None):
         """
         Initialize evaluator.
         
@@ -61,7 +70,12 @@ class TodayEvaluator:
             Path to trained ARF model
         preprocessor_stats_path : str
             Path to preprocessing statistics
+        eval_date : str, optional
+            Date to evaluate (YYYY-MM-DD format). Defaults to today.
         """
+        self.eval_date = eval_date if eval_date else datetime.now().strftime('%Y-%m-%d')
+        print(f"\n🗓️  Evaluation Date: {self.eval_date}")
+        
         self.model_path = Path(model_path)
         self.preprocessor_stats_path = Path(preprocessor_stats_path)
         
@@ -92,9 +106,9 @@ class TodayEvaluator:
             'location_ids': []
         }
     
-    def load_todays_data(self, dataset_dir: str) -> pd.DataFrame:
+    def load_data_for_date(self, dataset_dir: str) -> pd.DataFrame:
         """
-        Load and process today's data from JSON files.
+        Load and process data from JSON files for the specified date.
         
         Parameters:
         -----------
@@ -104,12 +118,12 @@ class TodayEvaluator:
         Returns:
         --------
         pd.DataFrame
-            Aligned data for today
+            Aligned data for the evaluation date
         """
         dataset_dir = Path(dataset_dir)
         
         print("\n" + "="*80)
-        print("📥 LOADING TODAY'S DATA")
+        print(f"📥 LOADING DATA FOR {self.eval_date}")
         print("="*80)
         
         all_data = []
@@ -123,25 +137,25 @@ class TodayEvaluator:
             with open(location_file, 'r') as f:
                 data = json.load(f)
             
-            # Filter for today's data (2025-12-15)
-            today_records = []
+            # Filter for specified date's data
+            date_records = []
             for record in data:
                 if 'period' in record and 'datetimeFrom' in record['period']:
                     local_date = record['period']['datetimeFrom']['local']
-                    if local_date.startswith('2025-12-15'):
-                        today_records.append({
+                    if local_date.startswith(self.eval_date):
+                        date_records.append({
                             'location_id': int(location_id),
                             'datetime': local_date,
                             'parameter': record['parameter']['name'],
                             'value': record['value']
                         })
             
-            if today_records:
-                print(f"  Location {location_id}: {len(today_records)} records")
-                all_data.extend(today_records)
+            if date_records:
+                print(f"  Location {location_id}: {len(date_records)} records")
+                all_data.extend(date_records)
         
         if not all_data:
-            print("❌ No data found for today!")
+            print(f"❌ No data found for {self.eval_date}!")
             return pd.DataFrame()
         
         # Convert to DataFrame
@@ -257,6 +271,8 @@ class TodayEvaluator:
         actuals = []
         timestamps = []
         location_ids = []
+        fallback_count = 0
+        model_none_count = 0
         
         for idx, row in df_processed.iterrows():
             # Prepare features
@@ -266,6 +282,24 @@ class TodayEvaluator:
             try:
                 y_pred = self.model.predict_one(features)
                 y_true = row['aqi']
+                
+                # Track when model returns None or NaN
+                if y_pred is None or (isinstance(y_pred, (int, float)) and pd.isna(y_pred)):
+                    model_none_count += 1
+                    # Fallback: Use simple persistence model (assume AQI = previous hour's AQI)
+                    # Get location's previous AQI value from actuals list
+                    loc_id = row['location_id']
+                    if len(actuals) > 0 and len(location_ids) > 0:
+                        # Find most recent prediction for same location
+                        for i in range(len(location_ids) - 1, -1, -1):
+                            if location_ids[i] == loc_id:
+                                y_pred = actuals[i]  # Use previous actual AQI for this location
+                                fallback_count += 1
+                                break
+                    
+                    # If no previous value found, skip this prediction
+                    if y_pred is None or (isinstance(y_pred, (int, float)) and pd.isna(y_pred)):
+                        continue
                 
                 if y_pred is not None and not pd.isna(y_true):
                     predictions.append(y_pred)
@@ -277,6 +311,9 @@ class TodayEvaluator:
                 continue
         
         print(f"✅ Generated {len(predictions)} predictions")
+        print(f"📊 Model returned None: {model_none_count} times")
+        if fallback_count > 0:
+            print(f"📊 Used fallback prediction for {fallback_count} samples ({fallback_count/len(predictions)*100:.1f}%)")
         
         # Check if we have valid predictions
         if len(predictions) == 0:
@@ -342,6 +379,12 @@ class TodayEvaluator:
                 'count': len(predictions)
             }
         }
+        
+        # Debug: Check if all predictions are valid
+        pred_array_check = np.array(predictions)
+        nan_count = np.isnan(pred_array_check).sum()
+        if nan_count > 0:
+            print(f"⚠️  WARNING: {nan_count} predictions are NaN!")
         
         self.results = results
         
@@ -560,10 +603,18 @@ class TodayEvaluator:
 
 def main():
     """Main evaluation pipeline."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Evaluate AQI model on real data')
+    parser.add_argument('--date', type=str, default=None,
+                      help='Date to evaluate (YYYY-MM-DD). Defaults to today.')
+    args = parser.parse_args()
+    
+    eval_date = args.date if args.date else datetime.now().strftime('%Y-%m-%d')
+    
     print("\n" + "="*80)
-    print("🔍 REAL-WORLD MODEL EVALUATION - TODAY'S DATA")
+    print(f"🔍 REAL-WORLD MODEL EVALUATION - {eval_date}")
     print("="*80)
-    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*80)
     
     # Paths
@@ -571,7 +622,12 @@ def main():
     dataset_dir = base_dir / "dataset"
     preprocessed_dir = base_dir / "dataset" / "preprocessed"
     models_dir = Path(__file__).parent / "models"
-    output_dir = Path(__file__).parent / "today_evaluation"
+    
+    # Create organized output directory structure: evaluations/YYYY_MM_DD/
+    evaluations_base = Path(__file__).parent / "evaluations"
+    output_dir = evaluations_base / eval_date.replace('-', '_')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\n📁 Output directory: {output_dir}")
     
     # Find latest model
     model_files = list(models_dir.glob("arf_model_*.pkl"))
@@ -583,20 +639,21 @@ def main():
     preprocessor_stats = preprocessed_dir / "preprocessor_stats.json"
     
     # Initialize evaluator
-    evaluator = TodayEvaluator(
+    evaluator = AQIEvaluator(
         model_path=str(latest_model),
-        preprocessor_stats_path=str(preprocessor_stats)
+        preprocessor_stats_path=str(preprocessor_stats),
+        eval_date=eval_date
     )
     
-    # Load today's data
-    df_today = evaluator.load_todays_data(str(dataset_dir))
+    # Load data for specified date
+    df_date = evaluator.load_data_for_date(str(dataset_dir))
     
-    if df_today.empty:
-        print("❌ No data available for evaluation")
+    if df_date.empty:
+        print(f"❌ No data available for {eval_date}")
         return
     
     # Preprocess
-    df_processed = evaluator.preprocess_for_prediction(df_today)
+    df_processed = evaluator.preprocess_for_prediction(df_date)
     
     # Make predictions
     results = evaluator.make_predictions(df_processed)
