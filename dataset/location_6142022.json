@@ -167998,5 +167998,425 @@
         "local": "2025-12-28T23:45:00+05:45"
       }
     }
+  },
+  {
+    "value": 36.3443333943685,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 19,
+      "name": "pm1",
+      "units": "µg/m³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 57.95083287556967,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 19,
+      "name": "pm1",
+      "units": "µg/m³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 61.936000061035166,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 2,
+      "name": "pm25",
+      "units": "µg/m³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 97.04483311971029,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 2,
+      "name": "pm25",
+      "units": "µg/m³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 48.5151668548584,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 98,
+      "name": "relativehumidity",
+      "units": "%",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 49.50783316294352,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 98,
+      "name": "relativehumidity",
+      "units": "%",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 17.105833625793455,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 100,
+      "name": "temperature",
+      "units": "c",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 16.654500166575115,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 100,
+      "name": "temperature",
+      "units": "c",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 2783.9720052083335,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 125,
+      "name": "um003",
+      "units": "particles/cm³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T18:00:00Z",
+        "local": "2025-12-28T23:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      }
+    }
+  },
+  {
+    "value": 4371.08818359375,
+    "flagInfo": {
+      "hasFlags": false
+    },
+    "parameter": {
+      "id": 125,
+      "name": "um003",
+      "units": "particles/cm³",
+      "displayName": null
+    },
+    "period": {
+      "label": "raw",
+      "interval": "01:00:00",
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    },
+    "coordinates": null,
+    "summary": null,
+    "coverage": {
+      "expectedCount": 1,
+      "expectedInterval": "01:00:00",
+      "observedCount": 1,
+      "observedInterval": "01:00:00",
+      "percentComplete": 100.0,
+      "percentCoverage": 100.0,
+      "datetimeFrom": {
+        "utc": "2025-12-28T19:00:00Z",
+        "local": "2025-12-29T00:45:00+05:45"
+      },
+      "datetimeTo": {
+        "utc": "2025-12-28T20:00:00Z",
+        "local": "2025-12-29T01:45:00+05:45"
+      }
+    }
   }
 ]
