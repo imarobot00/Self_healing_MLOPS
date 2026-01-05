@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI Forecast | Self-Healing MLOps</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .current-aqi {
+            text-align: center;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .aqi-value {
+            font-size: 3.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .aqi-category {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .timestamp {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        /* AQI Colors */
+        .aqi-good { background: linear-gradient(135deg, #00e676 0%, #00c853 100%); color: white; }
+        .aqi-moderate { background: linear-gradient(135deg, #ffeb3b 0%, #fbc02d 100%); color: #333; }
+        .aqi-sensitive { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; }
+        .aqi-unhealthy { background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); color: white; }
+        .aqi-very-unhealthy { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); color: white; }
+        .aqi-hazardous { background: linear-gradient(135deg, #880e4f 0%, #4a0e2e 100%); color: white; }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .forecast-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .forecast-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .forecast-item:hover {
+            transform: translateX(5px);
+            background: #e8f5e9;
+        }
+
+        .forecast-time {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .forecast-aqi {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .forecast-category {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #00e676;
+            box-shadow: 0 0 5px #00e676;
+        }
+
+        .api-status {
+            text-align: center;
+            color: white;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .error-box {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .error-box.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 Air Quality Forecast</h1>
+            <p class="subtitle">5-Hour AQI Predictions Based on Historical Data</p>
+        </header>
+
+        <div class="api-status" id="apiStatus">
+            <span class="status-indicator"></span>
+            <span>Loading...</span>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Location</label>
+                <select id="locationSelect">
+                    <option value="6142174">Location 6142174 (Ranibari)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Forecast Hours</label>
+                <input type="number" id="hoursInput" value="5" min="1" max="24">
+            </div>
+            <div class="control-group" style="display: flex; align-items: flex-end;">
+                <button class="btn" onclick="loadForecast()">🔮 Generate Forecast</button>
+            </div>
+        </div>
+
+        <div class="error-box" id="errorBox"></div>
+
+        <div id="loader" class="loader" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <div class="grid">
+                <!-- Current Conditions -->
+                <div class="card">
+                    <h2>📍 Current Conditions</h2>
+                    <div class="current-aqi" id="currentAqi">
+                        <div class="aqi-value">--</div>
+                        <div class="aqi-category">Loading...</div>
+                        <div class="timestamp"></div>
+                    </div>
+                    <div class="info-grid" id="currentInfo">
+                        <div class="info-item">
+                            <div class="info-label">PM2.5</div>
+                            <div class="info-value">-- µg/m³</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Temperature</div>
+                            <div class="info-value">-- °C</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Humidity</div>
+                            <div class="info-value">-- %</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">PM1</div>
+                            <div class="info-value">-- µg/m³</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Forecast List -->
+                <div class="card">
+                    <h2>⏰ 5-Hour Forecast</h2>
+                    <div class="forecast-list" id="forecastList">
+                        <!-- Forecast items will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card">
+                <h2>📈 AQI Trend & Forecast</h2>
+                <div class="chart-container">
+                    <canvas id="aqiChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🚀 Powered by Self-Healing MLOps | Adaptive Random Forest Model</p>
+            <p style="font-size: 0.9em; margin-top: 5px;">Model Accuracy: 93.2% R² | MAE: 4.31 AQI points</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let aqiChart = null;
+
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('apiStatus');
+                if (data.status === 'healthy') {
+                    statusEl.innerHTML = '<span class="status-indicator"></span><span>API Online | Model: ' + data.model_version + '</span>';
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').innerHTML = '<span class="status-indicator" style="background: #f44336;"></span><span>Cannot connect to API</span>';
+            }
+        }
+
+        async function loadLocations() {
+            try {
+                const response = await fetch(`${API_URL}/locations`);
+                const data = await response.json();
+                
+                const select = document.getElementById('locationSelect');
+                select.innerHTML = '';
+                
+                if (data.locations && Array.isArray(data.locations)) {
+                    data.locations.forEach(loc => {
+                        const option = document.createElement('option');
+                        option.value = loc.id;
+                        option.textContent = `Location ${loc.id}`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load locations:', error);
+            }
+        }
+
+        function getAQIClass(aqi) {
+            if (aqi <= 50) return 'aqi-good';
+            if (aqi <= 100) return 'aqi-moderate';
+            if (aqi <= 150) return 'aqi-sensitive';
+            if (aqi <= 200) return 'aqi-unhealthy';
+            if (aqi <= 300) return 'aqi-very-unhealthy';
+            return 'aqi-hazardous';
+        }
+
+        function getAQIColor(aqi) {
+            if (aqi <= 50) return '#00c853';
+            if (aqi <= 100) return '#fbc02d';
+            if (aqi <= 150) return '#f57c00';
+            if (aqi <= 200) return '#d32f2f';
+            if (aqi <= 300) return '#7b1fa2';
+            return '#4a0e2e';
+        }
+
+        async function loadForecast() {
+            const locationId = document.getElementById('locationSelect').value;
+            const hours = document.getElementById('hoursInput').value;
+            
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('errorBox').classList.remove('show');
+            
+            try {
+                const forecastResponse = await fetch(`${API_URL}/forecast?location_id=${locationId}&hours=${hours}`);
+                
+                if (!forecastResponse.ok) {
+                    const errorData = await forecastResponse.json();
+                    throw new Error(errorData.detail || 'Failed to fetch forecast');
+                }
+                
+                const forecastData = await forecastResponse.json();
+                
+                if (!forecastData.forecasts || !Array.isArray(forecastData.forecasts)) {
+                    throw new Error('Invalid forecast data received');
+                }
+                
+                const historyResponse = await fetch(`${API_URL}/history?location_id=${locationId}&hours=24`);
+                let historyData = { data: [] };
+                
+                if (historyResponse.ok) {
+                    historyData = await historyResponse.json();
+                }
+                
+                displayCurrentConditions(forecastData.current_conditions);
+                displayForecastList(forecastData.forecasts);
+                displayChart(historyData.data || [], forecastData.forecasts);
+                
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('loader').style.display = 'none';
+                const errorBox = document.getElementById('errorBox');
+                errorBox.textContent = '❌ Error: ' + error.message + '. Try a different location or make sure data is available.';
+                errorBox.classList.add('show');
+            }
+        }
+
+        function displayCurrentConditions(current) {
+            if (!current) return;
+            
+            const aqiDiv = document.getElementById('currentAqi');
+            aqiDiv.className = 'current-aqi ' + getAQIClass(current.aqi);
+            aqiDiv.querySelector('.aqi-value').textContent = Math.round(current.aqi);
+            aqiDiv.querySelector('.aqi-category').textContent = current.aqi_category;
+            aqiDiv.querySelector('.timestamp').textContent = 'Last updated: ' + new Date(current.timestamp).toLocaleString();
+            
+            const infoHtml = `
+                <div class="info-item">
+                    <div class="info-label">PM2.5</div>
+                    <div class="info-value">${current.pm25} µg/m³</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Temperature</div>
+                    <div class="info-value">${current.temperature} °C</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Humidity</div>
+            if (!forecasts || !Array.isArray(forecasts) || forecasts.length === 0) {
+                listDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #999;">No forecast data available</p>';
+                return;
+            }
+            
+                    <div class="info-value">${current.relativehumidity} %</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">PM1</div>
+                    <div class="info-value">${current.pm1} µg/m³</div>
+                </div>
+            `;
+            document.getElementById('currentInfo').innerHTML = infoHtml;
+        }
+
+        function displayForecastList(forecasts) {
+            const listDiv = document.getElementById('forecastList');
+            listDiv.innerHTML = '';
+            
+            forecasts.forEach(forecast => {
+                const time = new Date(forecast.timestamp);
+                const item = document.createElement('div');
+                item.className = 'forecast-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="forecast-time">+${forecast.hour}h | ${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div class="forecast-category">${forecast.aqi_category}</div>
+                    </div>
+                    <div class="forecast-aqi" style="color: ${getAQIColor(forecast.predicted_aqi)}">${Math.round(forecast.predicted_aqi)}</div>
+                `;
+                listDiv.appendChild(item);
+            });
+        }
+
+        function displayChart(history, forecasts) {
+            const ctx = document.getElementById('aqiChart').getContext('2d');
+            
+            const historicalLabels = history.map(h => new Date(h.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            const historicalData = history.map(h => h.aqi);
+            
+            const forecastLabels = forecasts.map(f => '+' + f.hour + 'h');
+            const forecastData = forecasts.map(f => f.predicted_aqi);
+            
+            const allLabels = [...historicalLabels, ...forecastLabels];
+            const historicalFullData = [...historicalData, ...Array(forecastData.length).fill(null)];
+            const forecastFullData = [...Array(historicalData.length - 1).fill(null), historicalData[historicalData.length - 1], ...forecastData];
+            
+            if (aqiChart) {
+                aqiChart.destroy();
+            }
+            
+            aqiChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: 'Historical AQI',
+                            data: historicalFullData,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Forecasted AQI',
+                            data: forecastFullData,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'AQI'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        checkAPIStatus();
+        loadLocations();
+        setTimeout(() => loadForecast(), 1000);
+    </script>
+</body>
+</html>

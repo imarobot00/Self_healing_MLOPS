@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Prediction | Self-Healing MLOps</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .unit {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 14px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-container {
+            display: none;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .aqi-display {
+            text-align: center;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .aqi-value {
+            font-size: 4em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .aqi-category {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .aqi-description {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        /* AQI Color Coding */
+        .aqi-good {
+            background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+            color: white;
+        }
+
+        .aqi-moderate {
+            background: linear-gradient(135deg, #ffeb3b 0%, #fbc02d 100%);
+            color: #333;
+        }
+
+        .aqi-sensitive {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+        }
+
+        .aqi-unhealthy {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: white;
+        }
+
+        .aqi-very-unhealthy {
+            background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+            color: white;
+        }
+
+        .aqi-hazardous {
+            background: linear-gradient(135deg, #880e4f 0%, #4a0e2e 100%);
+            color: white;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background: #00e676;
+            box-shadow: 0 0 5px #00e676;
+        }
+
+        .status-offline {
+            background: #f44336;
+            box-shadow: 0 0 5px #f44336;
+        }
+
+        .api-status {
+            text-align: center;
+            color: white;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .example-btn {
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .examples {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 Air Quality Prediction</h1>
+            <p class="subtitle">Real-time AQI predictions using Adaptive Random Forest ML</p>
+        </header>
+
+        <div class="api-status" id="apiStatus">
+            <span class="status-indicator status-offline"></span>
+            <span>Checking API status...</span>
+        </div>
+
+        <div class="main-content">
+            <!-- Input Form -->
+            <div class="card">
+                <h2>📊 Enter Sensor Data</h2>
+                
+                <form id="predictionForm">
+                    <div class="form-group">
+                        <label for="pm25">PM2.5 Concentration</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="pm25" step="0.1" min="0" max="1000" required placeholder="e.g., 45.2">
+                            <span class="unit">µg/m³</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pm1">PM1 Concentration</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="pm1" step="0.1" min="0" max="1000" required placeholder="e.g., 32.1">
+                            <span class="unit">µg/m³</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="temperature">Temperature</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="temperature" step="0.1" min="-50" max="60" required placeholder="e.g., 18.5">
+                            <span class="unit">°C</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="humidity">Relative Humidity</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="humidity" step="0.1" min="0" max="100" required placeholder="e.g., 65.3">
+                            <span class="unit">%</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="um003">Particle Count (UM003)</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="um003" step="0.1" min="0" required placeholder="e.g., 1250.0">
+                            <span class="unit">count</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn" id="predictBtn">🔮 Get Prediction</button>
+                </form>
+
+                <div class="examples">
+                    <p style="margin-bottom: 10px; color: #666;"><strong>Quick Examples:</strong></p>
+                    <button class="example-btn" onclick="fillExample('good')">☀️ Good</button>
+                    <button class="example-btn" onclick="fillExample('moderate')">🌤️ Moderate</button>
+                    <button class="example-btn" onclick="fillExample('unhealthy')">⚠️ Unhealthy</button>
+                </div>
+
+                <div class="loader" id="loader"></div>
+                <div class="error-message" id="errorMessage"></div>
+            </div>
+
+            <!-- Results Display -->
+            <div class="card">
+                <h2>🎯 Prediction Results</h2>
+                
+                <div class="result-container" id="resultContainer">
+                    <div class="aqi-display" id="aqiDisplay">
+                        <div class="aqi-value" id="aqiValue">--</div>
+                        <div class="aqi-category" id="aqiCategory">Waiting for prediction...</div>
+                        <div class="aqi-description" id="aqiDescription"></div>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Model Version</div>
+                            <div class="info-value" id="modelVersion">--</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Timestamp</div>
+                            <div class="info-value" id="timestamp">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3 style="margin-bottom: 10px; color: #667eea;">📖 AQI Categories</h3>
+                    <div style="font-size: 14px; line-height: 1.8;">
+                        <p><strong style="color: #00c853;">0-50:</strong> Good - Air quality is satisfactory</p>
+                        <p><strong style="color: #fbc02d;">51-100:</strong> Moderate - Acceptable for most people</p>
+                        <p><strong style="color: #f57c00;">101-150:</strong> Unhealthy for Sensitive Groups</p>
+                        <p><strong style="color: #d32f2f;">151-200:</strong> Unhealthy - Everyone may begin to experience health effects</p>
+                        <p><strong style="color: #7b1fa2;">201-300:</strong> Very Unhealthy - Health alert</p>
+                        <p><strong style="color: #4a0e2e;">300+:</strong> Hazardous - Emergency conditions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🚀 Powered by Self-Healing MLOps | Adaptive Random Forest Model</p>
+            <p style="font-size: 0.9em; margin-top: 5px;">Model Accuracy: 93.2% R² | MAE: 4.31 AQI points</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        // Check API status on load
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('apiStatus');
+                if (data.status === 'healthy') {
+                    statusEl.innerHTML = '<span class="status-indicator status-online"></span><span>API Online | Model: ' + data.model_version + '</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="status-indicator status-offline"></span><span>API Offline</span>';
+                }
+            } catch (error) {
+                const statusEl = document.getElementById('apiStatus');
+                statusEl.innerHTML = '<span class="status-indicator status-offline"></span><span>Cannot connect to API</span>';
+            }
+        }
+
+        // Fill example data
+        function fillExample(type) {
+            const examples = {
+                good: {
+                    pm25: 25.0,
+                    pm1: 18.0,
+                    temperature: 20.0,
+                    humidity: 60.0,
+                    um003: 1000.0
+                },
+                moderate: {
+                    pm25: 50.0,
+                    pm1: 38.0,
+                    temperature: 24.0,
+                    humidity: 55.0,
+                    um003: 1800.0
+                },
+                unhealthy: {
+                    pm25: 120.0,
+                    pm1: 95.0,
+                    temperature: 15.0,
+                    humidity: 75.0,
+                    um003: 4200.0
+                }
+            };
+
+            const data = examples[type];
+            document.getElementById('pm25').value = data.pm25;
+            document.getElementById('pm1').value = data.pm1;
+            document.getElementById('temperature').value = data.temperature;
+            document.getElementById('humidity').value = data.humidity;
+            document.getElementById('um003').value = data.um003;
+        }
+
+        // Get AQI class and description
+        function getAQIClass(aqi) {
+            if (aqi <= 50) return { class: 'aqi-good', desc: 'Air quality is satisfactory, and air pollution poses little or no risk.' };
+            if (aqi <= 100) return { class: 'aqi-moderate', desc: 'Air quality is acceptable. However, there may be a risk for some people.' };
+            if (aqi <= 150) return { class: 'aqi-sensitive', desc: 'Members of sensitive groups may experience health effects.' };
+            if (aqi <= 200) return { class: 'aqi-unhealthy', desc: 'Everyone may begin to experience health effects.' };
+            if (aqi <= 300) return { class: 'aqi-very-unhealthy', desc: 'Health alert: everyone may experience more serious health effects.' };
+            return { class: 'aqi-hazardous', desc: 'Health warning of emergency conditions. The entire population is likely to be affected.' };
+        }
+
+        // Handle form submission
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const predictBtn = document.getElementById('predictBtn');
+            const loader = document.getElementById('loader');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            // Show loader
+            predictBtn.disabled = true;
+            loader.classList.add('show');
+            errorMessage.classList.remove('show');
+            
+            // Collect form data
+            const formData = {
+                pm25: parseFloat(document.getElementById('pm25').value),
+                pm1: parseFloat(document.getElementById('pm1').value),
+                temperature: parseFloat(document.getElementById('temperature').value),
+                relativehumidity: parseFloat(document.getElementById('humidity').value),
+                um003: parseFloat(document.getElementById('um003').value)
+            };
+            
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // Display results
+                const aqiInfo = getAQIClass(result.predicted_aqi);
+                
+                const aqiDisplay = document.getElementById('aqiDisplay');
+                aqiDisplay.className = 'aqi-display ' + aqiInfo.class;
+                
+                document.getElementById('aqiValue').textContent = Math.round(result.predicted_aqi);
+                document.getElementById('aqiCategory').textContent = result.aqi_category;
+                document.getElementById('aqiDescription').textContent = aqiInfo.desc;
+                document.getElementById('modelVersion').textContent = result.model_version;
+                document.getElementById('timestamp').textContent = new Date(result.timestamp).toLocaleTimeString();
+                
+                resultContainer.classList.add('show');
+                
+            } catch (error) {
+                errorMessage.textContent = '❌ Error: ' + error.message + '. Make sure the API server is running!';
+                errorMessage.classList.add('show');
+            } finally {
+                predictBtn.disabled = false;
+                loader.classList.remove('show');
+            }
+        });
+
+        // Check API status on page load
+        checkAPIStatus();
+    </script>
+</body>
+</html>
