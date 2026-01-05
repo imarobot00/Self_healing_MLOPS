@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import pandas as pd
 import numpy as np
 from collections import deque
@@ -69,7 +69,24 @@ class PerformanceMonitor:
         # Alert log
         self.alerts = []
         
+        # Load sample predictions on startup
+        self._load_sample_predictions()
+        
         logger.info(f"PerformanceMonitor initialized - MAE threshold: {alert_threshold_mae}, R² threshold: {alert_threshold_r2}")
+    
+    def _load_sample_predictions(self):
+        """Load sample predictions from JSON file for demo purposes."""
+        sample_file = Path(__file__).parent / "sample_predictions.json"
+        if sample_file.exists():
+            try:
+                with open(sample_file, 'r') as f:
+                    data = json.load(f)
+                    predictions = data.get('predictions', [])
+                    for pred in predictions:
+                        self.recent_predictions.append(pred)
+                    logger.info(f"Loaded {len(predictions)} sample predictions")
+            except Exception as e:
+                logger.error(f"Error loading sample predictions: {e}")
     
     def log_prediction(self, 
                       location_id: int,
@@ -147,29 +164,33 @@ class PerformanceMonitor:
         dataset_path = Path(dataset_dir)
         updated_count = 0
         
-        # Load recent prediction logs (last 7 days)
-        recent_logs = []
+        # Load recent prediction logs (last 7 days) and store ALL entries
+        all_entries_by_date = {}
         for days_back in range(7):
             date = datetime.now() - timedelta(days=days_back)
-            log_file = self.log_dir / f"predictions_{date.strftime('%Y%m%d')}.jsonl"
+            date_str = date.strftime('%Y%m%d')
+            log_file = self.log_dir / f"predictions_{date_str}.jsonl"
             if log_file.exists():
                 with open(log_file, 'r') as f:
-                    for line in f:
-                        entry = json.loads(line.strip())
-                        if entry.get('actual_aqi') is None:  # Not yet updated
-                            recent_logs.append(entry)
+                    all_entries = [json.loads(line.strip()) for line in f]
+                    all_entries_by_date[date_str] = {
+                        'file': log_file,
+                        'entries': all_entries
+                    }
         
-        if not recent_logs:
+        if not all_entries_by_date:
             logger.info("No predictions to update with actuals")
             return 0
         
-        # Group by location
+        # Group predictions needing update by location
         by_location = {}
-        for entry in recent_logs:
-            loc_id = entry['location_id']
-            if loc_id not in by_location:
-                by_location[loc_id] = []
-            by_location[loc_id].append(entry)
+        for date_str, data in all_entries_by_date.items():
+            for entry in data['entries']:
+                if entry.get('actual_aqi') is None:  # Not yet updated
+                    loc_id = entry['location_id']
+                    if loc_id not in by_location:
+                        by_location[loc_id] = []
+                    by_location[loc_id].append((entry, date_str))
         
         # For each location, load data and match timestamps
         for loc_id, predictions in by_location.items():
@@ -189,7 +210,10 @@ class PerformanceMonitor:
                 for item in results:
                     try:
                         ts = item['period']['datetimeFrom']['utc']
+                        # Handle both string and dict parameter formats
                         param = item['parameter']
+                        if isinstance(param, dict):
+                            param = param.get('name', '')
                         value = item['value']
                         
                         if param == 'pm25':
@@ -198,7 +222,7 @@ class PerformanceMonitor:
                         continue
                 
                 # Match predictions with actuals
-                for pred in predictions:
+                for pred, date_str in predictions:
                     forecast_ts = pred['forecast_timestamp']
                     if forecast_ts in actual_data:
                         actual_pm25 = actual_data[forecast_ts]
@@ -216,8 +240,109 @@ class PerformanceMonitor:
             except Exception as e:
                 logger.error(f"Error updating actuals for location {loc_id}: {e}")
         
+        # Write all updated entries back to files
+        for date_str, data in all_entries_by_date.items():
+            log_file = data['file']
+            entries = data['entries']
+            with open(log_file, 'w') as f:
+                for entry in entries:
+                    f.write(json.dumps(entry) + '\n')
+        
         logger.info(f"Updated {updated_count} predictions with actual values")
+        
+        # Reload predictions from log files into memory for metrics calculation
+        self._reload_predictions_from_logs()
+        
         return updated_count
+    
+    def _reload_predictions_from_logs(self, days: int = 1):
+        """Reload predictions from log files into memory."""
+        self.recent_predictions.clear()
+        
+        for days_back in range(days):
+            date = datetime.now() - timedelta(days=days_back)
+            log_file = self.log_dir / f"predictions_{date.strftime('%Y%m%d')}.jsonl"
+            if log_file.exists():
+                with open(log_file, 'r') as f:
+                    for line in f:
+                        try:
+                            entry = json.loads(line.strip())
+                            self.recent_predictions.append(entry)
+                        except json.JSONDecodeError:
+                            continue
+        
+        logger.info(f"Reloaded {len(self.recent_predictions)} predictions from logs")
+    
+    def calculate_metrics_by_location(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Calculate metrics grouped by location.
+        Returns dict with location_id as key and metrics as value.
+        """
+        location_metrics = {}
+        
+        # Group ALL predictions by location (not just those with actuals)
+        all_predictions_by_loc = {}
+        predictions_with_actuals_by_loc = {}
+        
+        for p in self.recent_predictions:
+            loc_id = str(p.get('location_id', 'unknown'))
+            if loc_id not in all_predictions_by_loc:
+                all_predictions_by_loc[loc_id] = []
+            all_predictions_by_loc[loc_id].append(p)
+            
+            if p.get('actual_aqi') is not None:
+                if loc_id not in predictions_with_actuals_by_loc:
+                    predictions_with_actuals_by_loc[loc_id] = []
+                predictions_with_actuals_by_loc[loc_id].append(p)
+        
+        # Calculate metrics for each location
+        for location_id, all_preds in all_predictions_by_loc.items():
+            total_count = len(all_preds)
+            predictions_with_actuals = predictions_with_actuals_by_loc.get(location_id, [])
+            actuals_count = len(predictions_with_actuals)
+            
+            if actuals_count < 3:  # Need at least 3 for meaningful metrics
+                location_metrics[location_id] = {
+                    'mae': None,
+                    'rmse': None,
+                    'r2': None,
+                    'count': total_count,
+                    'actuals_count': actuals_count,
+                    'coverage': round(actuals_count / total_count, 3) if total_count > 0 else 0,
+                    'status': 'insufficient_data'
+                }
+                continue
+            
+            predictions = predictions_with_actuals
+            
+            predicted = np.array([p['predicted_aqi'] for p in predictions])
+            actual = np.array([p['actual_aqi'] for p in predictions])
+            
+            mae = float(np.mean(np.abs(predicted - actual)))
+            rmse = float(np.sqrt(np.mean((predicted - actual) ** 2)))
+            
+            ss_res = np.sum((actual - predicted) ** 2)
+            ss_tot = np.sum((actual - np.mean(actual)) ** 2)
+            r2 = float(1 - (ss_res / ss_tot)) if ss_tot != 0 else 0.0
+            
+            # Determine status
+            status = 'good'
+            if mae > self.alert_threshold_mae or r2 < self.alert_threshold_r2:
+                status = 'degraded'
+            
+            location_metrics[location_id] = {
+                'mae': round(mae, 2),
+                'rmse': round(rmse, 2),
+                'r2': round(r2, 3),
+                'count': total_count,
+                'actuals_count': actuals_count,
+                'coverage': round(actuals_count / total_count, 3) if total_count > 0 else 0,
+                'status': status,
+                'avg_error': round(float(np.mean(predicted - actual)), 2),
+                'max_error': round(float(np.max(np.abs(predicted - actual))), 2)
+            }
+        
+        return location_metrics
     
     def calculate_metrics(self) -> Dict:
         """
@@ -320,6 +445,21 @@ class PerformanceMonitor:
         )
         
         recent_metrics = self.metrics_history[-1] if self.metrics_history else None
+        location_metrics = self.calculate_metrics_by_location()
+        
+        return {
+            'total_predictions': total_predictions,
+            'predictions_with_actuals': predictions_with_actuals,
+            'coverage_rate': predictions_with_actuals / total_predictions if total_predictions > 0 else 0,
+            'recent_metrics': recent_metrics,
+            'alert_count_24h': len(self.get_alerts(hours=24)),
+            'monitoring_status': 'healthy' if recent_metrics and recent_metrics.get('status') == 'ok' else 'attention_needed',
+            'location_metrics': location_metrics
+        }
+    
+    def get_recent_alerts(self, hours: int = 24) -> List[Dict]:
+        """Alias for get_alerts for backward compatibility."""
+        return self.get_alerts(hours=hours)
         recent_alerts = self.get_alerts(hours=24)
         
         # Calculate average response time

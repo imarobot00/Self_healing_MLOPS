@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Monitoring Data</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        pre { background: #000; padding: 15px; border: 1px solid #0f0; overflow: auto; }
+        h2 { color: #0ff; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Monitoring Debug Page</h1>
+    <button onclick="fetchData()">Fetch Data</button>
+    
+    <h2>API Response:</h2>
+    <pre id="output">Click button to load...</pre>
+    
+    <script>
+        async function fetchData() {
+            try {
+                document.getElementById('output').textContent = 'Loading...';
+                
+                const response = await fetch('/monitoring/summary');
+                const data = await response.json();
+                
+                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                
+                // Also test calculations
+                console.log('Total predictions:', data.total_predictions);
+                console.log('With actuals:', data.predictions_with_actuals);
+                console.log('Locations:', Object.keys(data.location_metrics));
+                
+                // Calculate average MAE
+                let totalMAE = 0, count = 0;
+                for (const [loc, metrics] of Object.entries(data.location_metrics)) {
+                    if (metrics.mae !== null) {
+                        totalMAE += metrics.mae;
+                        count++;
+                        console.log(`Location ${loc}: MAE=${metrics.mae}`);
+                    }
+                }
+                if (count > 0) {
+                    console.log('Average MAE:', (totalMAE / count).toFixed(2));
+                }
+                
+            } catch (error) {
+                document.getElementById('output').textContent = 'ERROR: ' + error.message;
+                console.error('Error:', error);
+            }
+        }
+        
+        // Auto-fetch on load
+        fetchData();
+    </script>
+</body>
+</html>

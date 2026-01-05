@@ -29,6 +29,7 @@
             text-align: center;
             color: white;
             margin-bottom: 30px;
+            position: relative;
         }
 
         h1 {
@@ -40,6 +41,30 @@
         .subtitle {
             font-size: 1.1em;
             opacity: 0.9;
+        }
+
+        .monitoring-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .monitoring-btn:hover {
+            background: white;
+            color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
         .controls {
@@ -268,6 +293,7 @@
 <body>
     <div class="container">
         <header>
+            <a href="/monitoring" class="monitoring-btn">📊 Monitoring Dashboard</a>
             <h1>🌍 Air Quality Forecast</h1>
             <p class="subtitle">5-Hour AQI Predictions Based on Historical Data</p>
         </header>

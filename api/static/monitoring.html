@@ -210,6 +210,12 @@
         <div class="action-buttons">
             <button class="action-btn" onclick="updateActuals()">📥 Update Actuals from Dataset</button>
             <button class="action-btn" onclick="window.location.href='/'">🏠 Back to Forecast</button>
+            <div style="display: inline-block; margin-left: 15px;">
+                <label for="locationFilter" style="color: white; margin-right: 8px; font-weight: 600;">Filter:</label>
+                <select id="locationFilter" onchange="filterLocationTable()" style="padding: 8px 15px; border-radius: 15px; border: none; font-size: 0.9em; cursor: pointer;">
+                    <option value="all">All Locations</option>
+                </select>
+            </div>
         </div>
 
         <!-- Summary Cards -->
@@ -252,6 +258,29 @@
             </div>
         </div>
 
+        <!-- Location Metrics Table -->
+        <div class="chart-card" style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 20px;">📍 Performance by Location</h3>
+            <div style="overflow-x: auto;">
+                <table id="locationTable" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <th style="padding: 12px; text-align: left;">Location ID</th>
+                            <th style="padding: 12px; text-align: center;">Total</th>
+                            <th style="padding: 12px; text-align: center;">With Actuals</th>
+                            <th style="padding: 12px; text-align: center;">Coverage</th>
+                            <th style="padding: 12px; text-align: center;">MAE</th>
+                            <th style="padding: 12px; text-align: center;">R² Score</th>
+                            <th style="padding: 12px; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="locationTableBody" style="background: white;">
+                        <tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Performance Chart -->
         <div class="chart-card">
             <h3>📉 Performance Metrics Over Time</h3>
@@ -273,64 +302,157 @@
         async function loadAllData() {
             try {
                 await loadSummary();
-                await loadMetricsHistory();
-                await loadAlerts();
-                document.getElementById('lastUpdate').textContent = 
-                    `Last updated: ${new Date().toLocaleString()}`;
             } catch (error) {
-                console.error('Error loading dashboard:', error);
+                console.error('Error loading summary:', error);
+            }
+            
+            try {
+                await loadMetricsHistory();
+            } catch (error) {
+                console.error('Error loading metrics history:', error);
+            }
+            
+            try {
+                await loadAlerts();
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+            
+            try {
+                await loadLocationMetrics();
+            } catch (error) {
+                console.error('Error loading location metrics:', error);
+            }
+            
+            document.getElementById('lastUpdate').textContent = 
+                `Last updated: ${new Date().toLocaleString()}`;
+        }
+
+        async function loadLocationMetrics() {
+            try {
+                const response = await fetch('/monitoring/summary');
+                const data = await response.json();
+                const locationMetrics = data.location_metrics || {};
+                
+                const tbody = document.getElementById('locationTableBody');
+                tbody.innerHTML = '';
+                
+                if (Object.keys(locationMetrics).length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">No location data available yet</td></tr>';
+                    return;
+                }
+                
+                // Populate location filter dropdown
+                const filterSelect = document.getElementById('locationFilter');
+                const currentFilter = filterSelect.value;
+                filterSelect.innerHTML = '<option value="all">All Locations</option>';
+                Object.keys(locationMetrics).forEach(locId => {
+                    const option = document.createElement('option');
+                    option.value = locId;
+                    option.textContent = `Location ${locId}`;
+                    filterSelect.appendChild(option);
+                });
+                filterSelect.value = currentFilter;
+                
+                // Sort locations by total predictions (most active first)
+                const sortedLocations = Object.entries(locationMetrics).sort((a, b) => {
+                    return b[1].count - a[1].count;
+                });
+                
+                for (const [locationId, metrics] of sortedLocations) {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid #e0e0e0';
+                    row.style.transition = 'background-color 0.2s ease';
+                    row.onmouseover = () => row.style.backgroundColor = '#f8f9fa';
+                    row.onmouseout = () => row.style.backgroundColor = 'white';
+                    row.dataset.locationId = locationId;
+                    
+                    const statusColor = metrics.status === 'good' ? '#10b981' : 
+                                       metrics.status === 'degraded' ? '#f59e0b' : '#6b7280';
+                    const statusEmoji = metrics.status === 'good' ? '✅' : 
+                                       metrics.status === 'degraded' ? '⚠️' : '📊';
+                    
+                    const coverage = ((metrics.coverage || 0) * 100).toFixed(1);
+                    
+                    row.innerHTML = `
+                        <td style="padding: 12px; font-weight: 600;">📍 ${locationId}</td>
+                        <td style="padding: 12px; text-align: center;">${metrics.count}</td>
+                        <td style="padding: 12px; text-align: center;">${metrics.actuals_count || 0}</td>
+                        <td style="padding: 12px; text-align: center; font-weight: 600;">${coverage}%</td>
+                        <td style="padding: 12px; text-align: center; font-weight: 600; color: ${metrics.mae !== null && metrics.mae > 15 ? '#ef4444' : '#10b981'};">
+                            ${metrics.mae !== null ? metrics.mae.toFixed(2) : 'N/A'}
+                        </td>
+                        <td style="padding: 12px; text-align: center; font-weight: 600; color: ${metrics.r2 !== null && metrics.r2 < 0.75 ? '#ef4444' : '#10b981'};">
+                            ${metrics.r2 !== null ? metrics.r2.toFixed(3) : 'N/A'}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            <span style="background-color: ${statusColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                                ${statusEmoji} ${metrics.status}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            } catch (error) {
+                console.error('Error loading location metrics:', error);
+                document.getElementById('locationTableBody').innerHTML = 
+                    '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #e74c3c;">Error loading location data</td></tr>';
             }
         }
 
         async function loadSummary() {
-            const response = await fetch('/monitoring/summary');
-            const data = await response.json();
+            try {
+                const response = await fetch('/monitoring/summary');
+                const data = await response.json();
 
-            // Update summary cards
-            document.getElementById('totalPredictions').textContent = 
-                data.total_predictions || 0;
-            
-            const coverageRate = ((data.coverage_rate || 0) * 100).toFixed(1);
-            document.getElementById('coverageRate').textContent = coverageRate + '%';
-            
-            document.getElementById('alertCount').textContent = 
-                data.alert_count_24h || 0;
-
-            if (data.avg_response_time_ms) {
-                document.getElementById('responseTime').textContent = 
-                    data.avg_response_time_ms.toFixed(1) + ' ms';
-            }
-
-            // Update metrics if available
-            if (data.recent_metrics) {
-                const mae = data.recent_metrics.mae;
-                const r2 = data.recent_metrics.r2;
+                // Update summary cards
+                document.getElementById('totalPredictions').textContent = 
+                    data.total_predictions || 0;
                 
-                if (mae !== null) {
-                    document.getElementById('mae').textContent = mae.toFixed(2);
-                }
+                const coverageRate = ((data.coverage_rate || 0) * 100).toFixed(1);
+                document.getElementById('coverageRate').textContent = coverageRate + '%';
                 
-                if (r2 !== null) {
-                    document.getElementById('r2').textContent = r2.toFixed(4);
+                document.getElementById('alertCount').textContent = 
+                    data.alert_count_24h || 0;
+
+                if (data.avg_response_time_ms) {
+                    document.getElementById('responseTime').textContent = 
+                        data.avg_response_time_ms.toFixed(1) + ' ms';
                 }
 
-                // Update status badge
-                const statusEl = document.getElementById('status');
-                const status = data.recent_metrics.status || data.monitoring_status;
+                // Calculate overall metrics from location_metrics
+                const locationMetrics = data.location_metrics || {};
+                let totalMAE = 0, totalR2 = 0, countWithMetrics = 0;
                 
-                statusEl.className = 'status-badge';
-                if (status === 'ok' || status === 'healthy') {
-                    statusEl.classList.add('status-healthy');
-                    statusEl.textContent = '✓ Healthy';
-                } else if (status === 'degraded') {
-                    statusEl.classList.add('status-degraded');
-                    statusEl.textContent = '⚠ Degraded';
-                } else if (status === 'attention_needed') {
-                    statusEl.classList.add('status-attention');
-                    statusEl.textContent = '⚠ Attention Needed';
-                } else {
-                    statusEl.textContent = status;
+                for (const [loc, metrics] of Object.entries(locationMetrics)) {
+                    if (metrics.mae !== null && metrics.r2 !== null) {
+                        totalMAE += metrics.mae;
+                        totalR2 += metrics.r2;
+                        countWithMetrics++;
+                    }
                 }
+                
+                if (countWithMetrics > 0) {
+                    const avgMAE = totalMAE / countWithMetrics;
+                    const avgR2 = totalR2 / countWithMetrics;
+                    
+                    document.getElementById('mae').textContent = avgMAE.toFixed(2);
+                    document.getElementById('r2').textContent = avgR2.toFixed(4);
+                    
+                    // Update status badge based on overall metrics
+                    const statusEl = document.getElementById('status');
+                    statusEl.className = 'status-badge';
+                    
+                    if (avgMAE <= 15.0 && avgR2 >= 0.75) {
+                        statusEl.classList.add('status-healthy');
+                        statusEl.textContent = '✓ Healthy';
+                    } else {
+                        statusEl.classList.add('status-degraded');
+                        statusEl.textContent = '⚠ Degraded';
+                    }
+                }
+            } catch (error) {
+                console.error('Error in loadSummary:', error);
             }
         }
 
@@ -439,6 +561,21 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function filterLocationTable() {
+            const filterValue = document.getElementById('locationFilter').value;
+            const tbody = document.getElementById('locationTableBody');
+            const rows = tbody.getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                if (filterValue === 'all') {
+                    row.style.display = '';
+                } else {
+                    const locationId = row.dataset.locationId;
+                    row.style.display = locationId === filterValue ? '' : 'none';
+                }
+            }
         }
 
         async function updateActuals() {

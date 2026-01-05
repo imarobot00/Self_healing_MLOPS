@@ -329,6 +329,16 @@ async def monitoring_predictions(limit: int = 50):
         logger.error(f"Error getting predictions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/monitoring/locations", tags=["Monitoring"])
+async def monitoring_locations():
+    """Get detailed metrics for each location"""
+    try:
+        location_metrics = monitor.calculate_metrics_by_location()
+        return {"location_metrics": location_metrics}
+    except Exception as e:
+        logger.error(f"Error getting location metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/monitoring/alerts", tags=["Monitoring"])
 async def monitoring_alerts(hours: int = 24):
     """Get recent alerts"""
