@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Performance Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .metric-card h3 {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .metric-label {
+            color: #718096;
+            font-size: 0.9em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status-healthy {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-attention {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .status-degraded {
+            background: #feebc8;
+            color: #7c2d12;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .chart-card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .alert-list {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #f56565;
+            background: #fff5f5;
+            border-radius: 5px;
+        }
+
+        .alert-item.warning {
+            border-left-color: #ed8936;
+            background: #fffaf0;
+        }
+
+        .alert-timestamp {
+            font-size: 0.85em;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .alert-message {
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .no-alerts {
+            text-align: center;
+            color: #a0aec0;
+            padding: 40px;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            margin: 0 auto;
+            display: block;
+            margin-bottom: 20px;
+        }
+
+        .refresh-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .last-update {
+            text-align: center;
+            color: white;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        canvas {
+            max-height: 400px;
+        }
+
+        .action-buttons {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .action-btn {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-size: 0.95em;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Model Performance Monitoring</h1>
+
+        <button class="refresh-btn" onclick="loadAllData()">🔄 Refresh Dashboard</button>
+        <div class="last-update" id="lastUpdate">Last updated: Never</div>
+
+        <div class="action-buttons">
+            <button class="action-btn" onclick="updateActuals()">📥 Update Actuals from Dataset</button>
+            <button class="action-btn" onclick="window.location.href='/'">🏠 Back to Forecast</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="dashboard-grid">
+            <div class="metric-card">
+                <h3>📊 Model Performance</h3>
+                <div class="metric-value" id="mae">--</div>
+                <div class="metric-label">Mean Absolute Error (AQI points)</div>
+                <div class="status-badge" id="status">Loading...</div>
+            </div>
+
+            <div class="metric-card">
+                <h3>🎯 R² Score</h3>
+                <div class="metric-value" id="r2">--</div>
+                <div class="metric-label">Coefficient of Determination</div>
+            </div>
+
+            <div class="metric-card">
+                <h3>📈 Total Predictions</h3>
+                <div class="metric-value" id="totalPredictions">--</div>
+                <div class="metric-label">Predictions made</div>
+            </div>
+
+            <div class="metric-card">
+                <h3>✅ Coverage Rate</h3>
+                <div class="metric-value" id="coverageRate">--</div>
+                <div class="metric-label">Predictions with actuals</div>
+            </div>
+
+            <div class="metric-card">
+                <h3>⚡ Avg Response Time</h3>
+                <div class="metric-value" id="responseTime">--</div>
+                <div class="metric-label">Milliseconds</div>
+            </div>
+
+            <div class="metric-card">
+                <h3>🚨 Active Alerts</h3>
+                <div class="metric-value" id="alertCount">--</div>
+                <div class="metric-label">Last 24 hours</div>
+            </div>
+        </div>
+
+        <!-- Performance Chart -->
+        <div class="chart-card">
+            <h3>📉 Performance Metrics Over Time</h3>
+            <canvas id="metricsChart"></canvas>
+        </div>
+
+        <!-- Alerts -->
+        <div class="alert-list">
+            <h3 style="color: #667eea; margin-bottom: 20px;">🚨 Recent Alerts</h3>
+            <div id="alertsList">
+                <div class="no-alerts">No alerts</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let metricsChart = null;
+
+        async function loadAllData() {
+            try {
+                await loadSummary();
+                await loadMetricsHistory();
+                await loadAlerts();
+                document.getElementById('lastUpdate').textContent = 
+                    `Last updated: ${new Date().toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadSummary() {
+            const response = await fetch('/monitoring/summary');
+            const data = await response.json();
+
+            // Update summary cards
+            document.getElementById('totalPredictions').textContent = 
+                data.total_predictions || 0;
+            
+            const coverageRate = ((data.coverage_rate || 0) * 100).toFixed(1);
+            document.getElementById('coverageRate').textContent = coverageRate + '%';
+            
+            document.getElementById('alertCount').textContent = 
+                data.alert_count_24h || 0;
+
+            if (data.avg_response_time_ms) {
+                document.getElementById('responseTime').textContent = 
+                    data.avg_response_time_ms.toFixed(1) + ' ms';
+            }
+
+            // Update metrics if available
+            if (data.recent_metrics) {
+                const mae = data.recent_metrics.mae;
+                const r2 = data.recent_metrics.r2;
+                
+                if (mae !== null) {
+                    document.getElementById('mae').textContent = mae.toFixed(2);
+                }
+                
+                if (r2 !== null) {
+                    document.getElementById('r2').textContent = r2.toFixed(4);
+                }
+
+                // Update status badge
+                const statusEl = document.getElementById('status');
+                const status = data.recent_metrics.status || data.monitoring_status;
+                
+                statusEl.className = 'status-badge';
+                if (status === 'ok' || status === 'healthy') {
+                    statusEl.classList.add('status-healthy');
+                    statusEl.textContent = '✓ Healthy';
+                } else if (status === 'degraded') {
+                    statusEl.classList.add('status-degraded');
+                    statusEl.textContent = '⚠ Degraded';
+                } else if (status === 'attention_needed') {
+                    statusEl.classList.add('status-attention');
+                    statusEl.textContent = '⚠ Attention Needed';
+                } else {
+                    statusEl.textContent = status;
+                }
+            }
+        }
+
+        async function loadMetricsHistory() {
+            const response = await fetch('/monitoring/metrics?days=7');
+            const data = await response.json();
+            const metrics = data.metrics || [];
+
+            if (metrics.length === 0) return;
+
+            // Prepare chart data
+            const timestamps = metrics.map(m => new Date(m.timestamp).toLocaleDateString());
+            const maeData = metrics.map(m => m.mae);
+            const r2Data = metrics.map(m => m.r2 * 100); // Convert to percentage
+
+            // Destroy existing chart
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+
+            // Create new chart
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            metricsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: 'MAE (AQI points)',
+                            data: maeData,
+                            borderColor: '#f56565',
+                            backgroundColor: 'rgba(245, 101, 101, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'R² Score (%)',
+                            data: r2Data,
+                            borderColor: '#48bb78',
+                            backgroundColor: 'rgba(72, 187, 120, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'MAE (AQI points)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'R² Score (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    }
+                }
+            });
+        }
+
+        async function loadAlerts() {
+            const response = await fetch('/monitoring/alerts?hours=24');
+            const data = await response.json();
+            const alerts = data.alerts || [];
+
+            const alertsList = document.getElementById('alertsList');
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = '<div class="no-alerts">✓ No alerts in the last 24 hours</div>';
+                return;
+            }
+
+            alertsList.innerHTML = alerts.map(alert => `
+                <div class="alert-item ${alert.severity}">
+                    <div class="alert-timestamp">
+                        ${new Date(alert.timestamp).toLocaleString()}
+                    </div>
+                    <div class="alert-message">
+                        <strong>${alert.type}:</strong> ${alert.message}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function updateActuals() {
+            try {
+                document.querySelector('.action-btn').textContent = '⏳ Updating...';
+                const response = await fetch('/monitoring/update-actuals', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                alert('✅ ' + data.message + '\n\nRefresh the page in a few seconds to see updated metrics.');
+                
+                // Refresh after 3 seconds
+                setTimeout(() => {
+                    loadAllData();
+                }, 3000);
+            } catch (error) {
+                alert('❌ Error updating actuals: ' + error.message);
+            } finally {
+                document.querySelector('.action-btn').textContent = '📥 Update Actuals from Dataset';
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadAllData, 30000);
+
+        // Load data on page load
+        loadAllData();
+    </script>
+</body>
+</html>

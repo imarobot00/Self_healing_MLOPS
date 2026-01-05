@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -18,6 +18,7 @@ from schemas import (
 )
 from model_loader import ModelManager
 from forecaster import AQIForecaster
+from monitoring import PerformanceMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +48,27 @@ static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# Middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all API requests for monitoring"""
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    response_time = (time.time() - start_time) * 1000  # ms
+    
+    # Log request
+    monitor.log_request(
+        endpoint=request.url.path,
+        method=request.method,
+        params=dict(request.query_params),
+        status_code=response.status_code,
+        response_time_ms=response_time
+    )
+    
+    return response
+
 # Prometheus metrics
 prediction_counter = Counter('predictions_total', 'Total number of predictions')
 prediction_latency = Histogram('prediction_latency_seconds', 'Prediction latency')
@@ -55,6 +77,7 @@ feedback_counter = Counter('feedback_total', 'Total feedback received')
 # Global state
 model_manager = ModelManager()
 forecaster = None
+monitor = PerformanceMonitor()
 startup_time = time.time()
 
 @app.on_event("startup")
@@ -88,6 +111,14 @@ async def root():
         "web_interface": "/static/index.html"
     }
 
+@app.get("/monitoring", tags=["Root"])
+async def monitoring_dashboard():
+    """Serve the monitoring dashboard"""
+    static_file = Path(__file__).parent / "static" / "monitoring.html"
+    if static_file.exists():
+        return FileResponse(static_file)
+    return {"message": "Monitoring dashboard not found"}
+
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
     """Health check endpoint"""
@@ -116,6 +147,17 @@ async def predict(request: PredictionRequest):
         
         # Determine AQI category
         aqi_category = get_aqi_category(predicted_aqi)
+        
+        # Log prediction for monitoring
+        response_time = (time.time() - start_time) * 1000  # ms
+        monitor.log_prediction(
+            location_id=features.get('location_id', 0),
+            timestamp=datetime.now().isoformat(),
+            predicted_aqi=predicted_aqi,
+            input_features=features,
+            model_version=model_manager.model_metadata.get('version', 'unknown'),
+            response_time_ms=response_time
+        )
         
         # Record metrics
         prediction_counter.inc()
@@ -189,6 +231,17 @@ async def get_forecast(location_id: int = 6142174, hours: int = 5):
         forecasts = forecaster.forecast_next_hours(location_id, hours)
         current = forecaster.get_current_conditions(location_id)
         
+        # Log each forecast prediction for monitoring
+        for forecast in forecasts:
+            monitor.log_prediction(
+                location_id=location_id,
+                timestamp=forecast['timestamp'],
+                predicted_aqi=forecast['predicted_aqi'],
+                input_features={'pm25': forecast['pm25'], 'temperature': forecast['temperature'], 
+                               'relativehumidity': forecast['humidity']},
+                model_version=model_manager.model_metadata.get('version', 'unknown')
+            )
+        
         return {
             "location_id": location_id,
             "current_conditions": current,
@@ -245,6 +298,60 @@ async def get_locations():
         })
     
     return {"locations": locations}
+
+@app.get("/monitoring/summary", tags=["Monitoring"])
+async def monitoring_summary():
+    """Get monitoring summary with current performance metrics"""
+    try:
+        summary = monitor.get_summary()
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting monitoring summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/monitoring/metrics", tags=["Monitoring"])
+async def monitoring_metrics(days: int = 7):
+    """Get metrics history for the last N days"""
+    try:
+        history = monitor.get_metrics_history(days=days)
+        return {"metrics": history}
+    except Exception as e:
+        logger.error(f"Error getting metrics history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/monitoring/predictions", tags=["Monitoring"])
+async def monitoring_predictions(limit: int = 50):
+    """Get recent predictions with their actuals"""
+    try:
+        predictions = monitor.get_recent_predictions(limit=limit)
+        return {"predictions": predictions}
+    except Exception as e:
+        logger.error(f"Error getting predictions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/monitoring/alerts", tags=["Monitoring"])
+async def monitoring_alerts(hours: int = 24):
+    """Get recent alerts"""
+    try:
+        alerts = monitor.get_alerts(hours=hours)
+        return {"alerts": alerts}
+    except Exception as e:
+        logger.error(f"Error getting alerts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/monitoring/update-actuals", tags=["Monitoring"])
+async def update_actuals(background_tasks: BackgroundTasks):
+    """
+    Update predictions with actual values from dataset.
+    Run this after pulling new data to calculate performance metrics.
+    """
+    try:
+        background_tasks.add_task(monitor.update_actuals)
+        background_tasks.add_task(monitor.calculate_metrics)
+        return {"message": "Updating actuals and calculating metrics in background"}
+    except Exception as e:
+        logger.error(f"Error updating actuals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def get_aqi_category(aqi: float) -> str:
     """Convert AQI value to EPA category"""
