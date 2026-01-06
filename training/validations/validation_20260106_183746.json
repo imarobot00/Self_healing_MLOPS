@@ -1,0 +1,34 @@
+{
+  "decision": "REJECT",
+  "reasons": [
+    "R\u00b2 below minimum (-3.6817 < 0.8)",
+    "MAE above maximum (90.86 > 15.0)"
+  ],
+  "current_model": "model_20260106_180235",
+  "new_model": "model_20260106_180648",
+  "current_metrics": {
+    "mae": 90.86,
+    "rmse": 95.12,
+    "r2": -3.6817,
+    "mape": 427.05,
+    "max_error": 132.81,
+    "median_error": 100.03,
+    "n_predictions": 261
+  },
+  "new_metrics": {
+    "mae": 90.86,
+    "rmse": 95.12,
+    "r2": -3.6817,
+    "mape": 427.05,
+    "max_error": 132.81,
+    "median_error": 100.03,
+    "n_predictions": 261
+  },
+  "improvements": {
+    "mae": 0.0,
+    "rmse": 0.0,
+    "r2": -0.0
+  },
+  "timestamp": "2026-01-06T18:37:46.566104",
+  "validation_samples": 261
+}

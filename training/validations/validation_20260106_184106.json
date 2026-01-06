@@ -1,0 +1,36 @@
+{
+  "decision": "MARGINAL",
+  "reasons": [
+    "Models are essentially identical",
+    "MAE: 90.86 vs 90.86",
+    "R\u00b2: -3.6817 vs -3.6817",
+    "No meaningful difference - deployment optional"
+  ],
+  "current_model": "model_20260106_180235",
+  "new_model": "model_20260106_180648",
+  "current_metrics": {
+    "mae": 90.86,
+    "rmse": 95.12,
+    "r2": -3.6817,
+    "mape": 427.05,
+    "max_error": 132.81,
+    "median_error": 100.03,
+    "n_predictions": 261
+  },
+  "new_metrics": {
+    "mae": 90.86,
+    "rmse": 95.12,
+    "r2": -3.6817,
+    "mape": 427.05,
+    "max_error": 132.81,
+    "median_error": 100.03,
+    "n_predictions": 261
+  },
+  "improvements": {
+    "mae": 0.0,
+    "rmse": 0.0,
+    "r2_absolute": 0.0
+  },
+  "timestamp": "2026-01-06T18:41:06.523325",
+  "validation_samples": 261
+}

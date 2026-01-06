@@ -1,0 +1,39 @@
+{
+  "production": null,
+  "staging": null,
+  "models": {
+    "model_20260106_180235": {
+      "model_id": "model_20260106_180235",
+      "model_path": "/home/bipul/Bipul/Self Healing MLOps/training/models/model_20260106_180235",
+      "status": "candidate",
+      "registered_at": "2026-01-06T21:48:48.587171",
+      "metrics": {
+        "mae": 6.815204126267543,
+        "rmse": 11.298682981822683,
+        "r2": 0.930306407925183,
+        "samples": 6941,
+        "features": 68,
+        "training_time_seconds": 37.148322,
+        "predictions_count": 6941
+      },
+      "metadata": {}
+    },
+    "model_20260106_180648": {
+      "model_id": "model_20260106_180648",
+      "model_path": "/home/bipul/Bipul/Self Healing MLOps/training/models/model_20260106_180648",
+      "status": "candidate",
+      "registered_at": "2026-01-06T21:48:48.587736",
+      "metrics": {
+        "mae": 6.815204126267543,
+        "rmse": 11.298682981822683,
+        "r2": 0.930306407925183,
+        "samples": 6941,
+        "features": 68,
+        "training_time_seconds": 34.712279,
+        "predictions_count": 6941
+      },
+      "metadata": {}
+    }
+  },
+  "history": []
+}
