@@ -1,0 +1,17 @@
+{
+  "version": "20260106_180648",
+  "created_at": "2026-01-06T18:06:53.652198",
+  "metrics": {
+    "mae": 6.815204126267543,
+    "rmse": 11.298682981822683,
+    "r2": 0.930306407925183,
+    "samples": 6941,
+    "features": 68,
+    "training_time_seconds": 34.712279,
+    "predictions_count": 6941
+  },
+  "drift_threshold": 0.15,
+  "min_samples": 100,
+  "model_type": "AdaptiveRandomForestRegressor",
+  "retrain_trigger": "automatic_drift_detection"
+}

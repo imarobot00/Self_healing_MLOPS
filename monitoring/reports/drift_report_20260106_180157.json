@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-01-06T18:01:57.969350",
+  "analysis_window_days": 7,
+  "num_samples_analyzed": 200,
+  "overall_drift_score": 4.545953866250549,
+  "recommendation": "\ud83d\udd34 CRITICAL: Immediate retraining required! Overall drift score: 4.546. Critical features: pm25, temperature, relativehumidity",
+  "features": {
+    "pm25": {
+      "feature": "pm25",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 1.0,
+        "ks_p_value": 1.9426434495222354e-119,
+        "psi": 10.24208686511454
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.38720051322046145,
+        "recent_mean": 83.04310000000001,
+        "mean_change_pct": 21347.053184229,
+        "baseline_std": 0.21517576181877462,
+        "recent_std": 37.37031824041642,
+        "std_change_pct": 17267.3456176214
+      },
+      "sample_size": 200
+    },
+    "temperature": {
+      "feature": "temperature",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 0.9,
+        "ks_p_value": 5.416791199831646e-86,
+        "psi": 10.294008802985426
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.484682733740836,
+        "recent_mean": 16.831950000000003,
+        "mean_change_pct": 3372.776896773094,
+        "baseline_std": 0.19309047918071698,
+        "recent_std": 6.386644008984687,
+        "std_change_pct": 3207.591361357236
+      },
+      "sample_size": 200
+    },
+    "relativehumidity": {
+      "feature": "relativehumidity",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 0.8,
+        "ks_p_value": 3.5640292810890176e-32,
+        "psi": 9.508558328779154
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.4918847180313582,
+        "recent_mean": 29.273499999999995,
+        "mean_change_pct": 5851.292838931779,
+        "baseline_std": 0.20627481983787818,
+        "recent_std": 15.1512901348367,
+        "std_change_pct": 7245.1961546954035
+      },
+      "sample_size": 100
+    }
+  },
+  "baseline_info": {
+    "generated_at": "2026-01-06T13:46:09.045460",
+    "num_training_samples": 6941
+  }
+}
