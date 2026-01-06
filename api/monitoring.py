@@ -206,10 +206,14 @@ class PerformanceMonitor:
                 results = data if isinstance(data, list) else data.get('results', [])
                 
                 # Build a lookup dict: timestamp -> pm25 value
+                # Normalize timestamps to compare properly
                 actual_data = {}
                 for item in results:
                     try:
                         ts = item['period']['datetimeFrom']['utc']
+                        # Normalize timestamp: convert to datetime then back to ISO without microseconds
+                        ts_normalized = pd.to_datetime(ts).replace(microsecond=0, tzinfo=None).isoformat() + 'Z'
+                        
                         # Handle both string and dict parameter formats
                         param = item['parameter']
                         if isinstance(param, dict):
@@ -217,14 +221,35 @@ class PerformanceMonitor:
                         value = item['value']
                         
                         if param == 'pm25':
-                            actual_data[ts] = value
+                            actual_data[ts_normalized] = value
+                            # Also store with +00:00 suffix for compatibility
+                            actual_data[ts_normalized.replace('Z', '+00:00')] = value
                     except (KeyError, TypeError):
                         continue
                 
                 # Match predictions with actuals
                 for pred, date_str in predictions:
                     forecast_ts = pred['forecast_timestamp']
-                    if forecast_ts in actual_data:
+                    # Normalize prediction timestamp too
+                    try:
+                        pred_ts_normalized = pd.to_datetime(forecast_ts).replace(microsecond=0, tzinfo=None).isoformat() + 'Z'
+                    except:
+                        pred_ts_normalized = forecast_ts
+                    
+                    # Try both formats
+                    if pred_ts_normalized in actual_data:
+                        actual_pm25 = actual_data[pred_ts_normalized]
+                        actual_aqi = self._calculate_aqi(actual_pm25)
+                        error = abs(pred['predicted_aqi'] - actual_aqi)
+                        
+                        pred['actual_aqi'] = actual_aqi
+                        pred['error'] = error
+                        
+                        # Update in memory
+                        self.recent_errors.append(error)
+                        
+                        updated_count += 1
+                    elif forecast_ts in actual_data:
                         actual_pm25 = actual_data[forecast_ts]
                         actual_aqi = self._calculate_aqi(actual_pm25)
                         error = abs(pred['predicted_aqi'] - actual_aqi)

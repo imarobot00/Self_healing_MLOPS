@@ -106,23 +106,21 @@ class AQIForecaster:
         latest = hist_df.iloc[-1]
         
         forecasts = []
-        # Use the actual timestamp of the latest data, not current system time
-        latest_data_time = pd.to_datetime(latest['datetime'])
-        if latest_data_time.tzinfo is None:
-            latest_data_time = latest_data_time.tz_localize('UTC')
+        # Use current system time for forecasting (not historical data timestamp)
+        current_time = pd.Timestamp(datetime.now()).tz_localize('UTC')
         
-        # Start with the latest known values
+        # Start with the latest known values from data
         current_data = {
             'pm25': latest['pm25'],
             'pm1': latest['pm1'],
             'temperature': latest['temperature'],
             'relativehumidity': latest['relativehumidity'],
             'um003': latest['um003'],
-            'datetime': latest_data_time
+            'datetime': current_time
         }
         
-        logger.info(f"Starting forecast from: {latest_data_time} (latest data timestamp)")
-        logger.info(f"Latest values: PM2.5={latest['pm25']:.1f}, PM1={latest['pm1']:.1f}, Temp={latest['temperature']:.1f}")
+        logger.info(f"Starting forecast from: {current_time} (current system time)")
+        logger.info(f"Using latest sensor values from data: PM2.5={latest['pm25']:.1f}, PM1={latest['pm1']:.1f}, Temp={latest['temperature']:.1f}")
         
         # Calculate trends from recent data
         pm25_trend = 0
@@ -147,7 +145,7 @@ class AQIForecaster:
         
         # Generate predictions for each hour ahead
         for hour in range(1, hours_ahead + 1):
-            forecast_time = latest_data_time + timedelta(hours=hour)
+            forecast_time = current_time + timedelta(hours=hour)
             
             # Apply trends to sensor values (simulating how they would evolve)
             if hour > 1:
@@ -223,7 +221,7 @@ class AQIForecaster:
         return forecasts
     
     def get_current_conditions(self, location_id: int) -> Dict:
-        """Get the most recent recorded conditions"""
+        """Get the most recent recorded conditions with current timestamp"""
         hist_df = self.load_latest_data(location_id, hours=24)
         
         if len(hist_df) == 0:
@@ -235,7 +233,7 @@ class AQIForecaster:
         current_aqi = self.feature_engineer.calculate_aqi(latest['pm25'])
         
         return {
-            'timestamp': latest['datetime'].isoformat(),
+            'timestamp': datetime.now().isoformat(),  # Use current time, not data timestamp
             'pm25': float(latest['pm25']),
             'pm1': float(latest['pm1']),
             'temperature': float(latest['temperature']),
@@ -286,3 +284,80 @@ class AQIForecaster:
             return "Very Unhealthy"
         else:
             return "Hazardous"
+    
+    def backfill_predictions(self, location_id: int, hours_back: int = 12) -> List[Dict]:
+        """
+        Generate predictions for past hours where we have actual data.
+        This allows immediate validation and monitoring dashboard population.
+        
+        Parameters:
+        -----------
+        location_id : int
+            Location ID to generate predictions for
+        hours_back : int
+            How many hours back from latest data to generate predictions
+        
+        Returns:
+        --------
+        List[Dict] : Predictions for each past hour
+        """
+        # Load historical data
+        hist_df = self.load_latest_data(location_id, hours=168)  # Load up to 1 week
+        
+        if len(hist_df) < hours_back:
+            logger.warning(f"Only {len(hist_df)} hours of data available, requested {hours_back}")
+            hours_back = len(hist_df)
+        
+        # Get the latest data timestamp
+        latest_timestamp = hist_df['datetime'].max()
+        
+        predictions = []
+        
+        # Generate predictions for each hour going backwards
+        for hour in range(hours_back):
+            # Target timestamp to predict
+            target_time = latest_timestamp - timedelta(hours=hour)
+            
+            # Find the actual data at this timestamp (for input features)
+            target_data = hist_df[hist_df['datetime'] <= target_time].tail(1)
+            
+            if len(target_data) == 0:
+                continue
+            
+            actual_row = target_data.iloc[0]
+            
+            # Create input data
+            input_data = {
+                'pm25': actual_row['pm25'],
+                'pm1': actual_row['pm1'],
+                'temperature': actual_row['temperature'],
+                'relativehumidity': actual_row['relativehumidity'],
+                'um003': actual_row['um003'],
+                'datetime': target_time
+            }
+            
+            try:
+                # Generate features
+                features = self.feature_engineer.create_features(input_data, location_id)
+                
+                # Make prediction
+                predicted_aqi = self.model.predict_one(features)
+                
+                # Create prediction record
+                prediction = {
+                    'timestamp': target_time.isoformat(),
+                    'predicted_aqi': round(float(predicted_aqi), 2),
+                    'aqi_category': self._get_aqi_category(predicted_aqi),
+                    'pm25': round(float(actual_row['pm25']), 2),
+                    'temperature': round(float(actual_row['temperature']), 2),
+                    'humidity': round(float(actual_row['relativehumidity']), 2)
+                }
+                
+                predictions.append(prediction)
+                
+            except Exception as e:
+                logger.warning(f"Could not generate prediction for {target_time}: {e}")
+                continue
+        
+        logger.info(f"Generated {len(predictions)} backfill predictions for location {location_id}")
+        return predictions

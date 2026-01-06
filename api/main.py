@@ -363,6 +363,58 @@ async def update_actuals(background_tasks: BackgroundTasks):
         logger.error(f"Error updating actuals: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/monitoring/backfill-predictions", tags=["Monitoring"])
+async def backfill_predictions(hours_back: int = 12):
+    """
+    Generate predictions for past hours (where we have actual data).
+    This populates the monitoring dashboard immediately.
+    
+    Parameters:
+    - hours_back: How many hours back to generate predictions for (default: 12)
+    """
+    try:
+        if forecaster is None:
+            raise HTTPException(status_code=503, detail="Forecaster not initialized")
+        
+        # Get all available locations
+        data_dir = Path(__file__).parent.parent / "dataset"
+        location_files = list(data_dir.glob("location_*.json"))
+        
+        backfilled_count = 0
+        for loc_file in location_files:
+            location_id = int(loc_file.stem.replace('location_', ''))
+            
+            try:
+                # Generate backfill predictions for this location
+                backfill_forecasts = forecaster.backfill_predictions(location_id, hours_back=hours_back)
+                
+                # Log each prediction
+                for forecast in backfill_forecasts:
+                    monitor.log_prediction(
+                        location_id=location_id,
+                        timestamp=forecast['timestamp'],
+                        predicted_aqi=forecast['predicted_aqi'],
+                        input_features={'pm25': forecast['pm25'], 'temperature': forecast.get('temperature', 0)},
+                        model_version=model_manager.model_metadata.get('version', 'unknown')
+                    )
+                    backfilled_count += 1
+            except Exception as e:
+                logger.warning(f"Could not backfill location {location_id}: {e}")
+                continue
+        
+        # Now update actuals to match predictions with data
+        updated_count = monitor.update_actuals()
+        monitor.calculate_metrics()
+        
+        return {
+            "message": "Backfill complete",
+            "predictions_generated": backfilled_count,
+            "predictions_matched": updated_count
+        }
+    except Exception as e:
+        logger.error(f"Error in backfill: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 def get_aqi_category(aqi: float) -> str:
     """Convert AQI value to EPA category"""
     if aqi <= 50:
