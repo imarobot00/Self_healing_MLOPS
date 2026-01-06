@@ -106,8 +106,11 @@ class AQIForecaster:
         latest = hist_df.iloc[-1]
         
         forecasts = []
-        # Use current system time for forecasting (not historical data timestamp)
-        current_time = pd.Timestamp(datetime.now()).tz_localize('UTC')
+        # CRITICAL FIX: Use latest data timestamp (not current system time)
+        # This ensures predictions are made from actual data availability
+        latest_data_time = pd.Timestamp(latest['datetime'])
+        if latest_data_time.tz is None:
+            latest_data_time = latest_data_time.tz_localize('UTC')
         
         # Start with the latest known values from data
         current_data = {
@@ -116,11 +119,12 @@ class AQIForecaster:
             'temperature': latest['temperature'],
             'relativehumidity': latest['relativehumidity'],
             'um003': latest['um003'],
-            'datetime': current_time
+            'datetime': latest_data_time
         }
         
-        logger.info(f"Starting forecast from: {current_time} (current system time)")
-        logger.info(f"Using latest sensor values from data: PM2.5={latest['pm25']:.1f}, PM1={latest['pm1']:.1f}, Temp={latest['temperature']:.1f}")
+        logger.info(f"Starting forecast from: {latest_data_time} (latest data timestamp)")
+        logger.info(f"Using latest sensor values: PM2.5={latest['pm25']:.1f}, PM1={latest['pm1']:.1f}, Temp={latest['temperature']:.1f}")
+        logger.info(f"Will predict for: {latest_data_time + timedelta(hours=1)} to {latest_data_time + timedelta(hours=hours_ahead)}")
         
         # Calculate trends from recent data
         pm25_trend = 0
@@ -145,7 +149,7 @@ class AQIForecaster:
         
         # Generate predictions for each hour ahead
         for hour in range(1, hours_ahead + 1):
-            forecast_time = current_time + timedelta(hours=hour)
+            forecast_time = latest_data_time + timedelta(hours=hour)
             
             # Apply trends to sensor values (simulating how they would evolve)
             if hour > 1:

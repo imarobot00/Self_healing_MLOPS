@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-01-06T13:48:39.049220",
+  "analysis_window_days": 1,
+  "num_samples_analyzed": 200,
+  "overall_drift_score": 4.452337709978453,
+  "recommendation": "\ud83d\udd34 CRITICAL: Immediate retraining required! Overall drift score: 4.452. Critical features: pm25, temperature, relativehumidity",
+  "features": {
+    "pm25": {
+      "feature": "pm25",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 1.0,
+        "ks_p_value": 1.9426434495222354e-119,
+        "psi": 10.24208686511454
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.38720051322046145,
+        "recent_mean": 74.93440000000001,
+        "mean_change_pct": 19252.86691041507,
+        "baseline_std": 0.21517576181877462,
+        "recent_std": 40.68115010222794,
+        "std_change_pct": 18806.009560914405
+      },
+      "sample_size": 200
+    },
+    "temperature": {
+      "feature": "temperature",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 0.84,
+        "ks_p_value": 3.809740616460028e-72,
+        "psi": 10.224496684293594
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.484682733740836,
+        "recent_mean": 15.7475,
+        "mean_change_pct": 3149.032594674669,
+        "baseline_std": 0.19309047918071698,
+        "recent_std": 7.503373491303762,
+        "std_change_pct": 3785.936542879059
+      },
+      "sample_size": 200
+    },
+    "relativehumidity": {
+      "feature": "relativehumidity",
+      "drifted": true,
+      "severity": "critical",
+      "tests": {
+        "ks_statistic": 0.6,
+        "ks_p_value": 1.0624962385385807e-08,
+        "psi": 9.265949275430263
+      },
+      "distribution_changes": {
+        "baseline_mean": 0.4918847180313582,
+        "recent_mean": 23.849,
+        "mean_change_pct": 4748.493788432679,
+        "baseline_std": 0.20627481983787818,
+        "recent_std": 19.976335224459966,
+        "std_change_pct": 9584.330467557977
+      },
+      "sample_size": 50
+    }
+  },
+  "baseline_info": {
+    "generated_at": "2026-01-06T13:46:09.045460",
+    "num_training_samples": 6941
+  }
+}

@@ -20,6 +20,23 @@ from model_loader import ModelManager
 from forecaster import AQIForecaster
 from monitoring import PerformanceMonitor
 
+# Import drift detector using importlib to avoid naming conflicts
+import importlib.util
+import sys
+from pathlib import Path
+
+def _import_drift_detector():
+    """Import DriftDetector from monitoring package outside api/"""
+    spec = importlib.util.spec_from_file_location(
+        "drift_detection",
+        Path(__file__).parent.parent / "monitoring" / "drift_detector.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.DriftDetector
+
+DriftDetector = _import_drift_detector()
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -78,7 +95,16 @@ feedback_counter = Counter('feedback_total', 'Total feedback received')
 model_manager = ModelManager()
 forecaster = None
 monitor = PerformanceMonitor()
+drift_detector = None  # Lazy loaded
 startup_time = time.time()
+
+def get_drift_detector():
+    """Lazy load drift detector"""
+    global drift_detector
+    if drift_detector is None:
+        config_path = Path(__file__).parent.parent / "monitoring" / "drift_config.yaml"
+        drift_detector = DriftDetector(config_path=str(config_path))
+    return drift_detector
 
 @app.on_event("startup")
 async def startup_event():
@@ -347,6 +373,130 @@ async def monitoring_alerts(hours: int = 24):
         return {"alerts": alerts}
     except Exception as e:
         logger.error(f"Error getting alerts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/monitoring/drift", tags=["Monitoring"])
+async def get_drift_status(days: int = 1):
+    """
+    Get current drift detection status
+    
+    Args:
+        days: Number of days to analyze (default: 1)
+    
+    Returns:
+        Drift analysis report with recommendations
+    """
+    try:
+        detector = get_drift_detector()
+        report = detector.run_drift_check(days=days)
+        
+        # Add status code based on drift severity
+        if 'error' in report:
+            return {
+                "status": "error",
+                "report": report
+            }
+        
+        drift_score = report.get('overall_drift_score', 0)
+        
+        if drift_score > 0.5:
+            status = "critical"
+        elif drift_score > 0.3:
+            status = "warning"
+        elif drift_score > 0.2:
+            status = "minor"
+        else:
+            status = "healthy"
+        
+        return {
+            "status": status,
+            "report": report
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in drift detection: {e}")
+        raise HTTPException(status_code=500, detail=f"Drift detection failed: {str(e)}")
+
+@app.get("/monitoring/drift/history", tags=["Monitoring"])
+async def get_drift_history(limit: int = 10):
+    """
+    Get historical drift reports
+    
+    Args:
+        limit: Maximum number of reports to return
+    
+    Returns:
+        List of past drift reports
+    """
+    try:
+        reports_dir = Path("../monitoring/reports")
+        
+        if not reports_dir.exists():
+            return {"reports": []}
+        
+        # Get all drift report files
+        report_files = sorted(reports_dir.glob("drift_report_*.json"), reverse=True)
+        
+        reports = []
+        for report_file in report_files[:limit]:
+            try:
+                with open(report_file, 'r') as f:
+                    report = json.load(f)
+                    reports.append({
+                        "file": report_file.name,
+                        "timestamp": report.get('timestamp'),
+                        "drift_score": report.get('overall_drift_score'),
+                        "recommendation": report.get('recommendation'),
+                        "num_samples": report.get('num_samples_analyzed')
+                    })
+            except Exception as e:
+                logger.warning(f"Could not read {report_file}: {e}")
+                continue
+        
+        return {"reports": reports}
+    
+    except Exception as e:
+        logger.error(f"Error getting drift history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/monitoring/drift/reset-baseline", tags=["Monitoring"])
+async def reset_baseline():
+    """
+    Regenerate baseline statistics from current training data
+    
+    This should be called after model retraining to update the drift detection baseline
+    """
+    try:
+        import subprocess
+        
+        # Run baseline generation script
+        result = subprocess.run(
+            ["python", "../monitoring/generate_baseline.py"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if result.returncode == 0:
+            # Reload drift detector with new baseline
+            global drift_detector
+            drift_detector = None
+            
+            return {
+                "status": "success",
+                "message": "Baseline statistics regenerated",
+                "output": result.stdout
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Failed to regenerate baseline",
+                "error": result.stderr
+            }
+    
+    except Exception as e:
+        logger.error(f"Error resetting baseline: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/monitoring/update-actuals", tags=["Monitoring"])

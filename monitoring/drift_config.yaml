@@ -1,0 +1,70 @@
+# Drift Detection Configuration
+
+drift_detection:
+  enabled: true
+  
+  # How often to check for drift (in hours)
+  check_interval_hours: 6
+  
+  # Number of recent predictions to analyze
+  window_size: 200
+  
+  # Statistical test thresholds
+  thresholds:
+    # Kolmogorov-Smirnov test statistic threshold
+    ks_statistic: 0.3
+    
+    # P-value threshold (statistical significance)
+    p_value: 0.05
+    
+    # Population Stability Index threshold
+    psi_threshold: 0.2
+    
+    # Overall drift score threshold (triggers retraining)
+    drift_score: 0.5
+  
+  # Features to monitor for drift
+  features_to_monitor:
+    - pm25
+    - pm1
+    - temperature
+    - relativehumidity
+  
+  # Actions to take based on drift severity
+  actions:
+    low_drift:
+      threshold: 0.2
+      actions:
+        - log_info
+    
+    medium_drift:
+      threshold: 0.3
+      actions:
+        - log_warning
+        - send_alert
+    
+    high_drift:
+      threshold: 0.5
+      actions:
+        - log_critical
+        - send_alert
+        - trigger_retraining
+
+# Baseline data configuration
+baseline:
+  # Path to baseline statistics file
+  stats_file: "monitoring/baseline_stats.json"
+  
+  # Path to training data (for regenerating baseline)
+  training_data: "dataset/preprocessed/train_data.csv"
+
+# Reporting configuration
+reporting:
+  # Save detailed drift reports
+  save_reports: true
+  
+  # Reports directory
+  reports_dir: "monitoring/reports"
+  
+  # Keep reports for N days
+  retention_days: 30
