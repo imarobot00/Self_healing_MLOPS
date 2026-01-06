@@ -49,6 +49,15 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: update data from scheduled pipeline run [skip ci]"
+            
+            # Pull latest changes before pushing to avoid conflicts
+            git pull --rebase origin main || {
+              echo "Rebase conflict detected, using theirs strategy"
+              git checkout --theirs dataset/
+              git add dataset/
+              git rebase --continue || git rebase --skip
+            }
+            
             git push
           fi
       
