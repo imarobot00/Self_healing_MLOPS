@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-01-08T23:30:15.517225",
+  "counters": {
+    "predictions_total": {
+      "total": 150.0,
+      "by_labels": {
+        "model=\"model_v1\"": 100.0,
+        "model=\"model_v2\"": 50.0
+      }
+    },
+    "predictions_errors_total": {
+      "total": 3.0,
+      "by_labels": {
+        "model=\"model_v1\"": 3.0
+      }
+    },
+    "trainings_total": {
+      "total": 1.0,
+      "by_labels": {
+        "": 1.0
+      }
+    },
+    "trainings_success_total": {
+      "total": 1.0,
+      "by_labels": {
+        "": 1.0
+      }
+    },
+    "validations_total": {
+      "total": 1.0,
+      "by_labels": {
+        "": 1.0
+      }
+    },
+    "validations_approved_total": {
+      "total": 1.0,
+      "by_labels": {
+        "": 1.0
+      }
+    },
+    "deployments_total": {
+      "total": 1.0,
+      "by_labels": {
+        "": 1.0
+      }
+    }
+  },
+  "gauges": {
+    "model_mae": {
+      "model=\"model_v1\"": 6.5
+    },
+    "model_r2": {
+      "model=\"model_v1\"": 0.93
+    },
+    "model_drift_psi": 0.18,
+    "models_total": 5,
+    "models_by_status": {
+      "status=\"candidate\"": 2,
+      "status=\"production\"": 1
+    }
+  },
+  "histograms": {
+    "prediction_duration_seconds": {
+      "default": {
+        "count": 150,
+        "sum": 6.099999999999997,
+        "avg": 0.04066666666666665
+      }
+    },
+    "training_duration_seconds": {
+      "default": {
+        "count": 1,
+        "sum": 720,
+        "avg": 720.0
+      }
+    }
+  }
+}
