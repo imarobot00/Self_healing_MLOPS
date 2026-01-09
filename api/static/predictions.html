@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI Predictions Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .stat-card h3 {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .stat-card.good .value { color: #00ff88; }
+        .stat-card.moderate .value { color: #ffdd00; }
+        .stat-card.unhealthy .value { color: #ff6b6b; }
+        .stat-card.info .value { color: #00d4ff; }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            color: #00d4ff;
+        }
+        .chart-container {
+            height: 300px;
+        }
+        
+        .predictions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .predictions-table th,
+        .predictions-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .predictions-table th {
+            color: #888;
+            font-weight: 500;
+        }
+        .category-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .category-good { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .category-moderate { background: rgba(255, 221, 0, 0.2); color: #ffdd00; }
+        .category-unhealthy-sensitive { background: rgba(255, 165, 0, 0.2); color: #ffa500; }
+        .category-unhealthy { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .category-very-unhealthy { background: rgba(153, 50, 204, 0.2); color: #9932cc; }
+        .category-hazardous { background: rgba(139, 0, 0, 0.2); color: #dc143c; }
+        
+        .predict-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        .btn {
+            padding: 12px 30px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        .btn-container {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            display: none;
+        }
+        .result-box.show { display: block; }
+        .result-box h3 {
+            font-size: 1rem;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        .result-aqi {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+        .auto-predict {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        .auto-predict label {
+            color: #888;
+        }
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background: linear-gradient(90deg, #00d4ff, #00ff88); }
+        input:checked + .slider:before { transform: translateX(24px); }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .status-indicator.online { background: #00ff88; }
+        .status-indicator.offline { background: #ff6b6b; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 AQI Predictions Dashboard</h1>
+            <p><span class="status-indicator online" id="statusIndicator"></span>
+               <span id="statusText">Connected to API</span> | 
+               Model: <span id="modelVersion">Loading...</span>
+            </p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card info">
+                <h3>Total Predictions</h3>
+                <div class="value" id="totalPredictions">0</div>
+            </div>
+            <div class="stat-card" id="avgAqiCard">
+                <h3>Average AQI</h3>
+                <div class="value" id="avgAqi">-</div>
+            </div>
+            <div class="stat-card info">
+                <h3>Avg Latency</h3>
+                <div class="value" id="avgLatency">-</div>
+            </div>
+            <div class="stat-card info">
+                <h3>Uptime</h3>
+                <div class="value" id="uptime">-</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <h2>📊 Make Prediction</h2>
+                <form class="predict-form" id="predictForm">
+                    <div class="form-group">
+                        <label>PM2.5 (µg/m³)</label>
+                        <input type="number" id="pm25" value="45" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>PM1 (µg/m³)</label>
+                        <input type="number" id="pm1" value="30" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature (°C)</label>
+                        <input type="number" id="temperature" value="22" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Humidity (%)</label>
+                        <input type="number" id="relativehumidity" value="65" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Particle Count</label>
+                        <input type="number" id="um003" value="1200" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Hour (0-23)</label>
+                        <input type="number" id="hour" value="12" min="0" max="23">
+                    </div>
+                    <div class="btn-container">
+                        <button type="submit" class="btn btn-primary">🔮 Predict AQI</button>
+                        <button type="button" class="btn btn-primary" onclick="randomPredict()">🎲 Random</button>
+                    </div>
+                </form>
+                <div class="auto-predict">
+                    <label class="switch">
+                        <input type="checkbox" id="autoPredict" onchange="toggleAutoPredict()">
+                        <span class="slider"></span>
+                    </label>
+                    <label>Auto-predict every <input type="number" id="autoInterval" value="5" style="width:50px;padding:5px;background:rgba(255,255,255,0.1);border:1px solid #444;color:#fff;border-radius:4px;"> seconds</label>
+                </div>
+                <div class="result-box" id="resultBox">
+                    <h3>Prediction Result</h3>
+                    <div class="result-aqi" id="resultAqi">-</div>
+                    <div id="resultCategory">-</div>
+                    <div id="resultTime" style="color:#888;font-size:0.9rem;margin-top:10px;">-</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📈 AQI Trend</h2>
+                <div class="chart-container">
+                    <canvas id="aqiChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📋 Recent Predictions</h2>
+            <table class="predictions-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Time</th>
+                        <th>PM2.5</th>
+                        <th>Temp</th>
+                        <th>Humidity</th>
+                        <th>AQI</th>
+                        <th>Category</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionsTable">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let predictions = [];
+        let autoInterval = null;
+        let chart = null;
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('aqiChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'AQI',
+                        data: [],
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#888' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#888' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    }
+                }
+            });
+        }
+
+        // Check API health
+        async function checkHealth() {
+            try {
+                const res = await fetch('/health');
+                const data = await res.json();
+                document.getElementById('statusIndicator').className = 'status-indicator online';
+                document.getElementById('statusText').textContent = 'Connected to API';
+                document.getElementById('modelVersion').textContent = data.model_version || 'Unknown';
+                document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
+            } catch (e) {
+                document.getElementById('statusIndicator').className = 'status-indicator offline';
+                document.getElementById('statusText').textContent = 'Disconnected';
+            }
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds) return '-';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${h}h ${m}m`;
+        }
+
+        // Make prediction
+        async function makePrediction(data) {
+            const start = performance.now();
+            try {
+                const res = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                const latency = performance.now() - start;
+                
+                if (result.predicted_aqi !== undefined) {
+                    addPrediction({
+                        ...data,
+                        aqi: result.predicted_aqi,
+                        category: result.aqi_category,
+                        timestamp: result.timestamp,
+                        latency: latency
+                    });
+                    showResult(result, latency);
+                }
+                return result;
+            } catch (e) {
+                console.error('Prediction error:', e);
+                return null;
+            }
+        }
+
+        function addPrediction(pred) {
+            predictions.unshift(pred);
+            if (predictions.length > 50) predictions.pop();
+            updateUI();
+        }
+
+        function updateUI() {
+            // Update stats
+            document.getElementById('totalPredictions').textContent = predictions.length;
+            
+            if (predictions.length > 0) {
+                const avgAqi = predictions.reduce((a, b) => a + b.aqi, 0) / predictions.length;
+                const avgLat = predictions.reduce((a, b) => a + b.latency, 0) / predictions.length;
+                document.getElementById('avgAqi').textContent = avgAqi.toFixed(1);
+                document.getElementById('avgLatency').textContent = avgLat.toFixed(0) + 'ms';
+                
+                // Color based on AQI
+                const card = document.getElementById('avgAqiCard');
+                card.className = 'stat-card ' + getAqiClass(avgAqi);
+            }
+
+            // Update chart
+            chart.data.labels = predictions.slice(0, 20).reverse().map((_, i) => i + 1);
+            chart.data.datasets[0].data = predictions.slice(0, 20).reverse().map(p => p.aqi);
+            chart.update();
+
+            // Update table
+            const tbody = document.getElementById('predictionsTable');
+            tbody.innerHTML = predictions.slice(0, 15).map((p, i) => `
+                <tr>
+                    <td>${predictions.length - i}</td>
+                    <td>${new Date(p.timestamp).toLocaleTimeString()}</td>
+                    <td>${p.pm25}</td>
+                    <td>${p.temperature}°C</td>
+                    <td>${p.relativehumidity}%</td>
+                    <td style="font-weight:bold;color:${getAqiColor(p.aqi)}">${p.aqi.toFixed(1)}</td>
+                    <td><span class="category-badge category-${getCategoryClass(p.category)}">${p.category}</span></td>
+                    <td>${p.latency.toFixed(0)}ms</td>
+                </tr>
+            `).join('');
+        }
+
+        function showResult(result, latency) {
+            const box = document.getElementById('resultBox');
+            box.classList.add('show');
+            document.getElementById('resultAqi').textContent = result.predicted_aqi.toFixed(1);
+            document.getElementById('resultAqi').style.color = getAqiColor(result.predicted_aqi);
+            document.getElementById('resultCategory').innerHTML = `<span class="category-badge category-${getCategoryClass(result.aqi_category)}">${result.aqi_category}</span>`;
+            document.getElementById('resultTime').textContent = `${new Date(result.timestamp).toLocaleString()} | ${latency.toFixed(0)}ms`;
+        }
+
+        function getAqiColor(aqi) {
+            if (aqi <= 50) return '#00ff88';
+            if (aqi <= 100) return '#ffdd00';
+            if (aqi <= 150) return '#ffa500';
+            if (aqi <= 200) return '#ff6b6b';
+            if (aqi <= 300) return '#9932cc';
+            return '#dc143c';
+        }
+
+        function getAqiClass(aqi) {
+            if (aqi <= 50) return 'good';
+            if (aqi <= 100) return 'moderate';
+            return 'unhealthy';
+        }
+
+        function getCategoryClass(cat) {
+            return cat.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '');
+        }
+
+        function getFormData() {
+            return {
+                pm25: parseFloat(document.getElementById('pm25').value),
+                pm1: parseFloat(document.getElementById('pm1').value),
+                temperature: parseFloat(document.getElementById('temperature').value),
+                relativehumidity: parseFloat(document.getElementById('relativehumidity').value),
+                um003: parseFloat(document.getElementById('um003').value),
+                hour: parseInt(document.getElementById('hour').value),
+                day_of_week: new Date().getDay(),
+                month: new Date().getMonth() + 1
+            };
+        }
+
+        function randomPredict() {
+            document.getElementById('pm25').value = (20 + Math.random() * 80).toFixed(1);
+            document.getElementById('pm1').value = (10 + Math.random() * 50).toFixed(1);
+            document.getElementById('temperature').value = (10 + Math.random() * 25).toFixed(1);
+            document.getElementById('relativehumidity').value = (30 + Math.random() * 50).toFixed(1);
+            document.getElementById('um003').value = Math.floor(500 + Math.random() * 2000);
+            document.getElementById('hour').value = Math.floor(Math.random() * 24);
+            makePrediction(getFormData());
+        }
+
+        function toggleAutoPredict() {
+            const enabled = document.getElementById('autoPredict').checked;
+            const interval = parseInt(document.getElementById('autoInterval').value) * 1000;
+            
+            if (autoInterval) {
+                clearInterval(autoInterval);
+                autoInterval = null;
+            }
+            
+            if (enabled) {
+                autoInterval = setInterval(() => randomPredict(), interval);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('predictForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            makePrediction(getFormData());
+        });
+
+        // Initialize
+        initChart();
+        checkHealth();
+        setInterval(checkHealth, 10000);
+    </script>
+</body>
+</html>

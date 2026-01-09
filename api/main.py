@@ -139,12 +139,14 @@ async def startup_event():
         model_manager.load_latest_model()
         logger.info("Model loaded successfully on startup")
         
-        # Initialize forecaster
+        # Initialize forecaster with data directory from env
+        data_dir = os.environ.get('DATA_DIR', '../dataset')
         forecaster = AQIForecaster(
             model=model_manager.current_model,
-            feature_engineer=model_manager.feature_engineer
+            feature_engineer=model_manager.feature_engineer,
+            data_dir=data_dir
         )
-        logger.info("Forecaster initialized successfully")
+        logger.info(f"Forecaster initialized successfully with data_dir={data_dir}")
     except Exception as e:
         logger.error(f"Failed to load model on startup: {e}")
         raise
@@ -161,6 +163,14 @@ async def root():
         "docs": "/docs",
         "web_interface": "/static/index.html"
     }
+
+@app.get("/forecast-ui", tags=["Root"])
+async def forecast_ui():
+    """Serve the forecast dashboard - shows predictions from real data"""
+    static_file = Path(__file__).parent / "static" / "forecast.html"
+    if static_file.exists():
+        return FileResponse(static_file)
+    return {"error": "Forecast UI not found"}
 
 @app.get("/monitoring", tags=["Root"])
 async def monitoring_dashboard():
@@ -365,6 +375,9 @@ async def get_forecast(location_id: int = 6142174, hours: int = 5):
                                'relativehumidity': forecast['humidity']},
                 model_version=model_manager.model_metadata.get('version', 'unknown')
             )
+            # Increment prediction counter for each forecast hour
+            prediction_counter.inc()
+            metrics_collector.increment('predictions_total', labels={'model': model_manager.model_metadata.get('version', 'unknown')})
         
         return {
             "location_id": location_id,
@@ -410,15 +423,29 @@ async def get_history(location_id: int = 6142174, hours: int = 24):
 @app.get("/locations", tags=["Forecast"])
 async def get_locations():
     """Get list of available locations"""
-    data_dir = Path(__file__).parent.parent / "dataset"
+    data_dir = Path(os.environ.get('DATA_DIR', '../dataset'))
     location_files = list(data_dir.glob("location_*.json"))
+    
+    # Location name mapping
+    location_names = {
+        3459: "Ratna Park",
+        5506835: "US Embassy",
+        5509787: "Pulchowk",
+        6093549: "Bhaisepati",
+        6093550: "Kirtipur",
+        6093551: "Lalitpur",
+        6133623: "Boudha",
+        6142022: "Thamel",
+        6142174: "Ranibari",
+        6142175: "Chabahil"
+    }
     
     locations = []
     for file in location_files:
         location_id = int(file.stem.replace('location_', ''))
         locations.append({
             "id": location_id,
-            "name": f"Location {location_id}"
+            "name": location_names.get(location_id, f"Location {location_id}")
         })
     
     return {"locations": locations}

@@ -18,8 +18,11 @@ services:
       - ./training/models:/models
       # Mount logs
       - ./api/logs:/logs
+      # Mount dataset for forecasting
+      - ./dataset:/dataset:ro
     environment:
       - MODEL_PATH=/models
+      - DATA_DIR=/dataset
       - API_PORT=8000
       - PYTHONUNBUFFERED=1
     networks:

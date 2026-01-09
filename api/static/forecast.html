@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI Forecast - Kathmandu Valley</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-size: 0.9rem;
+            color: #888;
+        }
+        
+        select, button {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        select {
+            background: #2d2d44;
+            color: #fff;
+            min-width: 200px;
+        }
+        
+        button {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status-bar {
+            background: #2d2d44;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .current-conditions {
+            background: #2d2d44;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .current-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .current-aqi {
+            text-align: center;
+        }
+        
+        .aqi-value {
+            font-size: 4rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .aqi-label {
+            font-size: 1.2rem;
+            margin-top: 5px;
+        }
+        
+        .current-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-card {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .detail-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .detail-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .forecast-section {
+            background: #2d2d44;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .forecast-section h2 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        
+        .forecast-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .forecast-card {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .forecast-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .forecast-time {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        
+        .forecast-aqi {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .forecast-category {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        /* AQI Colors */
+        .aqi-good { color: #00e400; }
+        .aqi-moderate { color: #ffff00; }
+        .aqi-sensitive { color: #ff7e00; }
+        .aqi-unhealthy { color: #ff0000; }
+        .aqi-very-unhealthy { color: #8f3f97; }
+        .aqi-hazardous { color: #7e0023; }
+        
+        .bg-good { background: rgba(0, 228, 0, 0.2); color: #00e400; }
+        .bg-moderate { background: rgba(255, 255, 0, 0.2); color: #cccc00; }
+        .bg-sensitive { background: rgba(255, 126, 0, 0.2); color: #ff7e00; }
+        .bg-unhealthy { background: rgba(255, 0, 0, 0.2); color: #ff0000; }
+        .bg-very-unhealthy { background: rgba(143, 63, 151, 0.2); color: #8f3f97; }
+        .bg-hazardous { background: rgba(126, 0, 35, 0.2); color: #ff4444; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #2d2d44;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff4444;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            color: #ff4444;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .aqi-value { font-size: 3rem; }
+            .controls { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌤️ AQI Forecast</h1>
+            <p class="subtitle">Kathmandu Valley Air Quality Prediction</p>
+        </header>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Select Location</label>
+                <select id="locationSelect">
+                    <option value="">Loading locations...</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button id="refreshBtn" onclick="loadForecast()">🔄 Get Forecast</button>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot"></div>
+                <span>Live Data</span>
+            </div>
+            <div class="status-item">
+                <span id="lastUpdate">Last update: --</span>
+            </div>
+            <div class="status-item">
+                <span id="modelVersion">Model: --</span>
+            </div>
+        </div>
+        
+        <div id="content">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Select a location and click "Get Forecast"</p>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Data updates every 2 hours via automated pipeline • Model: Adaptive Random Forest</p>
+            <p>Pull latest data: <code>git pull origin main</code></p>
+        </footer>
+    </div>
+    
+    <script>
+        let forecastChart = null;
+        
+        // Load locations on page load
+        document.addEventListener('DOMContentLoaded', loadLocations);
+        
+        async function loadLocations() {
+            try {
+                const response = await fetch('/locations');
+                const data = await response.json();
+                
+                const select = document.getElementById('locationSelect');
+                select.innerHTML = '<option value="">-- Select Location --</option>';
+                
+                data.locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+                
+                // Auto-select first location if available
+                if (data.locations.length > 0) {
+                    select.value = data.locations[0].id;
+                }
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                document.getElementById('locationSelect').innerHTML = 
+                    '<option value="">Error loading locations</option>';
+            }
+        }
+        
+        async function loadForecast() {
+            const locationId = document.getElementById('locationSelect').value;
+            if (!locationId) {
+                alert('Please select a location');
+                return;
+            }
+            
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            
+            document.getElementById('content').innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Fetching forecast data...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/forecast?location_id=${locationId}&hours=5`);
+                const data = await response.json();
+                
+                renderForecast(data);
+                
+                document.getElementById('lastUpdate').textContent = 
+                    `Last update: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('modelVersion').textContent = 
+                    `Model: v${data.model_version}`;
+                    
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <h3>⚠️ Error Loading Forecast</h3>
+                        <p>${error.message}</p>
+                        <p>Make sure the data files are available and try again.</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Get Forecast';
+            }
+        }
+        
+        function getAQIColor(aqi) {
+            if (aqi <= 50) return 'good';
+            if (aqi <= 100) return 'moderate';
+            if (aqi <= 150) return 'sensitive';
+            if (aqi <= 200) return 'unhealthy';
+            if (aqi <= 300) return 'very-unhealthy';
+            return 'hazardous';
+        }
+        
+        function renderForecast(data) {
+            const current = data.current_conditions;
+            const forecasts = data.forecasts;
+            const aqiColor = getAQIColor(current?.aqi || forecasts[0]?.predicted_aqi || 0);
+            
+            let html = `
+                <div class="current-conditions">
+                    <div class="current-header">
+                        <h2>📍 Current Conditions</h2>
+                        <span>${current?.timestamp ? new Date(current.timestamp).toLocaleString() : 'Latest data'}</span>
+                    </div>
+                    <div class="current-aqi">
+                        <div class="aqi-value aqi-${aqiColor}">${Math.round(current?.aqi || forecasts[0]?.predicted_aqi || 0)}</div>
+                        <div class="aqi-label">${current?.category || forecasts[0]?.category || 'AQI'}</div>
+                    </div>
+                    <div class="current-details">
+                        <div class="detail-card">
+                            <div class="detail-value">${(current?.pm25 || forecasts[0]?.pm25 || 0).toFixed(1)}</div>
+                            <div class="detail-label">PM2.5 µg/m³</div>
+                        </div>
+                        <div class="detail-card">
+                            <div class="detail-value">${(current?.temperature || forecasts[0]?.temperature || 0).toFixed(1)}°</div>
+                            <div class="detail-label">Temperature</div>
+                        </div>
+                        <div class="detail-card">
+                            <div class="detail-value">${(current?.humidity || current?.relativehumidity || forecasts[0]?.humidity || 0).toFixed(0)}%</div>
+                            <div class="detail-label">Humidity</div>
+                        </div>
+                        <div class="detail-card">
+                            <div class="detail-value">${(current?.pm1 || forecasts[0]?.pm1 || 0).toFixed(1)}</div>
+                            <div class="detail-label">PM1 µg/m³</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="forecast-section">
+                    <h2>📈 5-Hour Forecast</h2>
+                    <div class="forecast-cards">
+            `;
+            
+            forecasts.forEach((f, i) => {
+                const fColor = getAQIColor(f.predicted_aqi);
+                const time = new Date(f.timestamp);
+                const hourLabel = i === 0 ? 'Now' : `+${i}h`;
+                
+                html += `
+                    <div class="forecast-card">
+                        <div class="forecast-time">${hourLabel} • ${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div class="forecast-aqi aqi-${fColor}">${Math.round(f.predicted_aqi)}</div>
+                        <div class="forecast-category bg-${fColor}">${f.category}</div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('content').innerHTML = html;
+            
+            // Create chart
+            createChart(forecasts);
+        }
+        
+        function createChart(forecasts) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            if (forecastChart) {
+                forecastChart.destroy();
+            }
+            
+            const labels = forecasts.map((f, i) => i === 0 ? 'Now' : `+${i}h`);
+            const aqiData = forecasts.map(f => f.predicted_aqi);
+            const pm25Data = forecasts.map(f => f.pm25);
+            
+            forecastChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Predicted AQI',
+                            data: aqiData,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'PM2.5',
+                            data: pm25Data,
+                            borderColor: '#ff7e00',
+                            backgroundColor: 'rgba(255, 126, 0, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#888' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'AQI',
+                                color: '#00d4ff'
+                            },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#888' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'PM2.5 (µg/m³)',
+                                color: '#ff7e00'
+                            },
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Auto-refresh every 5 minutes
+        setInterval(() => {
+            const locationId = document.getElementById('locationSelect').value;
+            if (locationId) {
+                loadForecast();
+            }
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
