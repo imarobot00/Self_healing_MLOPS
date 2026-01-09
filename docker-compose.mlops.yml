@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # ================================
+  # ML Services
+  # ================================
+  
+  # Prediction API Service
+  mlops-api:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    container_name: mlops-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount models directory (shared with training)
+      - ./training/models:/models
+      # Mount logs
+      - ./api/logs:/logs
+    environment:
+      - MODEL_PATH=/models
+      - API_PORT=8000
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mlops-network
+      - monitoring_monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - mlops-training
+    labels:
+      - "com.mlops.service=api"
+      - "com.mlops.tier=application"
+
+  # Training Service
+  mlops-training:
+    build:
+      context: .
+      dockerfile: ./training/Dockerfile
+    container_name: mlops-training
+    ports:
+      - "8001:8001"
+    volumes:
+      # Mount models directory (shared with API)
+      - ./training/models:/models
+      # Mount data directory
+      - ./dataset/preprocessed:/data:ro
+      # Mount training outputs
+      - ./training/logs:/logs
+      - ./training/charts:/charts
+      - ./training/evaluations:/evaluations
+      - ./training/validations:/validations
+      - ./training/orchestrator_logs:/orchestrator_logs
+      - ./training/registry.json:/registry.json
+    environment:
+      - MODEL_PATH=/models
+      - DATA_PATH=/data
+      - TRAINING_PORT=8001
+      - TRAINING_CHECK_INTERVAL=300
+      - DRIFT_THRESHOLD=0.15
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mlops-network
+      - monitoring_monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.mlops.service=training"
+      - "com.mlops.tier=ml-pipeline"
+
+  # Self-Healing Orchestrator
+  mlops-orchestrator:
+    build:
+      context: .
+      dockerfile: ./training/Dockerfile
+    container_name: mlops-orchestrator
+    command: ["python", "run_orchestrator_service.py"]
+    ports:
+      - "8002:8002"
+    volumes:
+      # Same volumes as training (shares registry, models, etc.)
+      - ./training/models:/models
+      - ./dataset/preprocessed:/data:ro
+      - ./training/logs:/logs
+      - ./training/orchestrator_logs:/orchestrator_logs
+      - ./training/registry.json:/registry.json
+    environment:
+      - MODEL_PATH=/models
+      - DATA_PATH=/data
+      - API_URL=http://mlops-api:8000
+      - TRAINING_URL=http://mlops-training:8001
+      - ORCHESTRATOR_PORT=8002
+      - ORCHESTRATOR_CHECK_INTERVAL=180
+      - AUTO_PROMOTE_MARGINAL=false
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mlops-network
+      - monitoring_monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - mlops-api
+      - mlops-training
+    labels:
+      - "com.mlops.service=orchestrator"
+      - "com.mlops.tier=ml-pipeline"
+
+# ================================
+# Networks
+# ================================
+networks:
+  # ML services network
+  mlops-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  
+  # Connect to monitoring network (from monitoring/docker-compose.yml)
+  monitoring_monitoring:
+    external: true
+
+# ================================
+# Volumes
+# ================================
+volumes:
+  # Shared models volume
+  mlops-models:
+    driver: local

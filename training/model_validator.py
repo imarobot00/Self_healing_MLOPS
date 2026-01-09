@@ -81,22 +81,28 @@ class ModelValidator:
         self.models_dir = Path(models_dir)
         
         if validation_data_path is None:
-            # Use last 15% of test data for validation
-            validation_data_path = os.path.join(
+            # Check environment variable first, then default path
+            data_path = os.environ.get('DATA_PATH', os.path.join(
                 os.path.dirname(__file__),
                 '..',
                 'dataset',
-                'preprocessed',
-                'test_data.csv'
-            )
+                'preprocessed'
+            ))
+            validation_data_path = os.path.join(data_path, 'test_data.csv')
         self.validation_data_path = Path(validation_data_path)
         
         # Load preprocessor stats for denormalization
-        preprocessor_stats_path = Path(__file__).parent.parent / 'dataset' / 'preprocessed' / 'preprocessor_stats.json'
-        with open(preprocessor_stats_path, 'r') as f:
-            stats = json.load(f)
-            self.pm25_min = stats['feature_stats']['pm25']['min']
-            self.pm25_max = stats['feature_stats']['pm25']['max']
+        data_path = os.environ.get('DATA_PATH', str(Path(__file__).parent.parent / 'dataset' / 'preprocessed'))
+        preprocessor_stats_path = Path(data_path) / 'preprocessor_stats.json'
+        try:
+            with open(preprocessor_stats_path, 'r') as f:
+                stats = json.load(f)
+                self.pm25_min = stats['feature_stats']['pm25']['min']
+                self.pm25_max = stats['feature_stats']['pm25']['max']
+        except FileNotFoundError:
+            logger.warning(f"Preprocessor stats not found at {preprocessor_stats_path}, using defaults")
+            self.pm25_min = 0.0
+            self.pm25_max = 500.0
         
         # Thresholds
         self.mae_improvement_threshold = mae_improvement_threshold

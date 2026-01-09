@@ -6,6 +6,7 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from fastapi.responses import Response
 import logging
 import time
+import os
 from datetime import datetime
 from typing import Dict
 from pathlib import Path
@@ -111,7 +112,7 @@ prediction_latency = Histogram('prediction_latency_seconds', 'Prediction latency
 feedback_counter = Counter('feedback_total', 'Total feedback received')
 
 # Global state
-model_manager = ModelManager()
+model_manager = ModelManager(models_dir=os.environ.get('MODEL_PATH'))
 forecaster = None
 monitor = PerformanceMonitor()
 drift_detector = None  # Lazy loaded
@@ -237,7 +238,9 @@ async def predict(request: PredictionRequest):
         duration = time.time() - start_time
         metrics_collector.increment('predictions_total', labels={'model': model_manager.model_metadata.get('version', 'unknown')})
         metrics_collector.observe('prediction_duration_seconds', duration)
-        metrics_collector.set_gauge('model_mae', monitor.calculate_metrics().get('mae', 0))
+        mae_value = monitor.calculate_metrics().get('mae')
+        if mae_value is not None:
+            metrics_collector.set_gauge('model_mae', mae_value)
         
         # Check for alerts
         alert_manager.check_and_alert(metrics_collector.get_summary())

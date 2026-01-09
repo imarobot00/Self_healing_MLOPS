@@ -11,7 +11,7 @@ class ModelManager:
     """Manages loading, versioning, and switching of ML models"""
     
     def __init__(self, models_dir: str = None):
-        if models_dir is None:
+        if models_dir is None or models_dir == "":
             # Try relative path first, then absolute
             models_dir = Path("../training/models")
             if not models_dir.exists():

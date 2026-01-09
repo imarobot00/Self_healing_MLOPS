@@ -202,6 +202,8 @@ class MetricsCollector:
     
     def set_gauge(self, name: str, value: float, labels: Dict[str, str] = None):
         """Set a gauge metric value."""
+        if value is None:
+            return  # Skip None values
         with self.lock:
             label_key = self._serialize_labels(labels or {})
             self.gauges[name][label_key] = value
