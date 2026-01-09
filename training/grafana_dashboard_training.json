@@ -1,0 +1,223 @@
+{
+  "dashboard": {
+    "title": "ML Training Pipeline",
+    "uid": "mlops-training",
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+        "type": "stat",
+        "title": "Total Trainings",
+        "targets": [
+          {
+            "expr": "trainings_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+        "type": "stat",
+        "title": "Success Rate",
+        "targets": [
+          {
+            "expr": "trainings_success_total / trainings_total * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+        "type": "stat",
+        "title": "Failed Trainings",
+        "targets": [
+          {
+            "expr": "trainings_failed_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "type": "graph",
+        "title": "Training Duration",
+        "targets": [
+          {
+            "expr": "training_duration_seconds",
+            "legendFormat": "Training time",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"}
+        ]
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "type": "graph",
+        "title": "Drift Checks",
+        "targets": [
+          {
+            "expr": "rate(drift_checks_total[5m])",
+            "legendFormat": "Checks/min",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "cpm", "label": "Checks"}
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 14},
+        "type": "stat",
+        "title": "Total Validations",
+        "targets": [
+          {
+            "expr": "validations_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 14},
+        "type": "stat",
+        "title": "Approved",
+        "targets": [
+          {
+            "expr": "validations_approved_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "fixed", "fixedColor": "green"}
+          }
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 14},
+        "type": "stat",
+        "title": "Rejected",
+        "targets": [
+          {
+            "expr": "validations_rejected_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "fixed", "fixedColor": "red"}
+          }
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "type": "stat",
+        "title": "Models in Registry",
+        "targets": [
+          {
+            "expr": "models_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "type": "graph",
+        "title": "Models by Status",
+        "targets": [
+          {
+            "expr": "models_by_status",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 28},
+        "type": "stat",
+        "title": "Total Deployments",
+        "targets": [
+          {
+            "expr": "deployments_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 28},
+        "type": "stat",
+        "title": "Rollbacks",
+        "targets": [
+          {
+            "expr": "rollbacks_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "orange"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 28},
+        "type": "stat",
+        "title": "Healing Workflows",
+        "targets": [
+          {
+            "expr": "healing_workflows_total",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  }
+}

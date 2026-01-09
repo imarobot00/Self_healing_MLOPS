@@ -1,0 +1,230 @@
+# Alert Manager Configuration for ML System
+# ==========================================
+
+global:
+  # The root route on which each incoming alert enters
+  resolve_timeout: 5m
+  
+  # SMTP email settings (configure with your credentials)
+  smtp_from: 'mlops-alerts@example.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'your-email@gmail.com'
+  smtp_auth_password: 'your-app-password'
+  smtp_require_tls: true
+  
+  # Slack webhook (configure with your webhook URL)
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree
+route:
+  # Default receiver if no route matches
+  receiver: 'default'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'component', 'severity']
+  
+  # Time to wait before sending initial notification
+  group_wait: 30s
+  
+  # Time to wait before sending notification about new alerts in group
+  group_interval: 5m
+  
+  # Time to wait before resending notification if alert is still firing
+  repeat_interval: 4h
+  
+  # Child routes (more specific)
+  routes:
+    
+    # Critical alerts (P1) - immediate notification
+    - match:
+        tier: P1
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true  # Also send to default
+    
+    # High priority alerts (P2) - quick notification
+    - match:
+        tier: P2
+      receiver: 'high-priority'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 2h
+    
+    # Medium priority alerts (P3) - batched notification
+    - match:
+        tier: P3
+      receiver: 'medium-priority'
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 12h
+    
+    # Low priority/info alerts (P4) - daily digest
+    - match:
+        tier: P4
+      receiver: 'low-priority'
+      group_wait: 1h
+      group_interval: 24h
+      repeat_interval: 24h
+    
+    # Model-specific alerts
+    - match:
+        component: model
+      receiver: 'ml-team'
+      group_by: ['alertname', 'model']
+    
+    # API alerts
+    - match:
+        component: api
+      receiver: 'api-team'
+    
+    # Training pipeline alerts
+    - match:
+        component: training
+      receiver: 'ml-team'
+    
+    # Infrastructure alerts
+    - match:
+        component: system
+      receiver: 'devops-team'
+
+# Inhibition rules (suppress alerts when another alert is firing)
+inhibit_rules:
+  
+  # If API is down, don't alert on no predictions
+  - source_match:
+      alertname: 'APIDown'
+    target_match:
+      alertname: 'NoPredictions'
+    equal: ['service']
+  
+  # If service is unhealthy, suppress health check alerts
+  - source_match:
+      alertname: 'ServiceUnhealthy'
+    target_match:
+      alertname: 'HealthCheckFailing'
+    equal: ['service']
+  
+  # If severe drift, suppress moderate drift alert
+  - source_match:
+      alertname: 'SevereModelDrift'
+    target_match:
+      alertname: 'ModerateModelDrift'
+    equal: ['model']
+
+# Receivers (notification channels)
+receivers:
+  
+  # Default receiver - logs only
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+  
+  # Critical alerts - Slack + Email + PagerDuty
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#mlops-critical'
+        title: '🔴 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+        color: 'danger'
+    
+    email_configs:
+      - to: 'ml-oncall@example.com'
+        headers:
+          Subject: '[P1 CRITICAL] {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Critical Alert</h2>
+          {{ range .Alerts }}
+          <p><strong>{{ .Annotations.summary }}</strong></p>
+          <p>{{ .Annotations.description }}</p>
+          <p><em>Runbook: {{ .Annotations.runbook }}</em></p>
+          {{ end }}
+        send_resolved: true
+  
+  # High priority - Slack + Email
+  - name: 'high-priority'
+    slack_configs:
+      - channel: '#mlops-alerts'
+        title: '🟠 HIGH: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+    
+    email_configs:
+      - to: 'ml-team@example.com'
+        headers:
+          Subject: '[P2 HIGH] {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # Medium priority - Slack only
+  - name: 'medium-priority'
+    slack_configs:
+      - channel: '#mlops-alerts'
+        title: '🟡 MEDIUM: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}: {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        color: 'good'
+  
+  # Low priority - Email digest
+  - name: 'low-priority'
+    email_configs:
+      - to: 'ml-team@example.com'
+        headers:
+          Subject: '[P4 INFO] Daily Digest - {{ .GroupLabels.alertname }}'
+        send_resolved: false
+  
+  # ML Team - Slack + Email
+  - name: 'ml-team'
+    slack_configs:
+      - channel: '#ml-team'
+        title: '📊 ML Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          Runbook: {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+    
+    email_configs:
+      - to: 'ml-team@example.com'
+        send_resolved: true
+  
+  # API Team - Slack
+  - name: 'api-team'
+    slack_configs:
+      - channel: '#api-team'
+        title: '🌐 API Alert: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # DevOps Team - Slack + Email
+  - name: 'devops-team'
+    slack_configs:
+      - channel: '#devops'
+        title: '⚙️ Infrastructure Alert: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+    
+    email_configs:
+      - to: 'devops@example.com'
+        send_resolved: true

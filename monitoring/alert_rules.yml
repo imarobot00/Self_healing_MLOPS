@@ -1,0 +1,311 @@
+# Prometheus Alert Rules for ML System
+# =====================================
+
+groups:
+  # ====================
+  # ML Model Performance Alerts
+  # ====================
+  - name: ml_model_performance
+    interval: 1m
+    rules:
+      
+      - alert: ModelPerformanceDegraded
+        expr: model_mae > 10.0
+        for: 10m
+        labels:
+          severity: critical
+          component: model
+          tier: P2
+        annotations:
+          summary: "Model MAE too high"
+          description: "Model MAE is {{ $value }}, exceeding threshold of 10.0 for {{ $labels.model }}"
+          runbook: "Check model drift, retrain if necessary"
+      
+      - alert: ModelR2TooLow
+        expr: model_r2 < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: model
+          tier: P3
+        annotations:
+          summary: "Model R² score below threshold"
+          description: "R² is {{ $value }}, below 0.7 for {{ $labels.model }}"
+          runbook: "Investigate data quality and model performance"
+      
+      - alert: SevereModelDrift
+        expr: model_drift_psi > 0.3
+        for: 5m
+        labels:
+          severity: critical
+          component: model
+          tier: P1
+        annotations:
+          summary: "Severe model drift detected"
+          description: "PSI score is {{ $value }}, exceeding severe threshold of 0.3"
+          runbook: "Immediate retraining required. Alert ML team."
+      
+      - alert: ModerateModelDrift
+        expr: model_drift_psi > 0.1 and model_drift_psi <= 0.3
+        for: 30m
+        labels:
+          severity: warning
+          component: model
+          tier: P3
+        annotations:
+          summary: "Moderate model drift detected"
+          description: "PSI score is {{ $value }}, indicating some drift"
+          runbook: "Monitor closely, schedule retraining soon"
+
+  # ====================
+  # API Performance Alerts
+  # ====================
+  - name: api_performance
+    interval: 30s
+    rules:
+      
+      - alert: HighPredictionLatency
+        expr: histogram_quantile(0.95, rate(prediction_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+          tier: P2
+        annotations:
+          summary: "API latency too high"
+          description: "P95 latency is {{ $value }}s, exceeding 1s threshold"
+          runbook: "Check API resources, investigate slow predictions"
+      
+      - alert: HighErrorRate
+        expr: (rate(predictions_errors_total[5m]) / rate(predictions_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+          tier: P2
+        annotations:
+          summary: "High prediction error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}, exceeding 5% threshold"
+          runbook: "Check API logs, investigate failing predictions"
+      
+      - alert: NoPredictions
+        expr: rate(predictions_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: api
+          tier: P1
+        annotations:
+          summary: "No predictions being made"
+          description: "API has not served any predictions in 10 minutes"
+          runbook: "Check if API is down, investigate immediately"
+      
+      - alert: APIDown
+        expr: up{job="mlops-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+          tier: P1
+        annotations:
+          summary: "ML API is down"
+          description: "Prometheus cannot scrape ML API metrics"
+          runbook: "Check API health, restart if needed"
+
+  # ====================
+  # Training Pipeline Alerts
+  # ====================
+  - name: training_pipeline
+    interval: 1m
+    rules:
+      
+      - alert: TrainingFailed
+        expr: increase(trainings_failed_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: training
+          tier: P2
+        annotations:
+          summary: "Model training failed"
+          description: "{{ $value }} training runs failed in the last hour"
+          runbook: "Check training logs, investigate data or resource issues"
+      
+      - alert: TrainingTooSlow
+        expr: histogram_quantile(0.5, rate(training_duration_seconds_bucket[1h])) > 3600
+        for: 10m
+        labels:
+          severity: warning
+          component: training
+          tier: P3
+        annotations:
+          summary: "Training taking too long"
+          description: "Median training time is {{ $value | humanizeDuration }}, exceeding 1 hour"
+          runbook: "Check training data size, consider optimization"
+      
+      - alert: NoRecentTraining
+        expr: time() - timestamp(trainings_total) > 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+          component: training
+          tier: P3
+        annotations:
+          summary: "No training in past week"
+          description: "Last training was {{ $value | humanizeDuration }} ago"
+          runbook: "Check if drift detection is working, may need manual trigger"
+
+  # ====================
+  # Validation Alerts
+  # ====================
+  - name: validation
+    interval: 1m
+    rules:
+      
+      - alert: HighValidationRejectionRate
+        expr: (rate(validations_rejected_total[1h]) / rate(validations_total[1h])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: validation
+          tier: P3
+        annotations:
+          summary: "Many models being rejected"
+          description: "{{ $value | humanizePercentage }} of validations rejected in past hour"
+          runbook: "Check validation criteria, investigate training issues"
+
+  # ====================
+  # System Health Alerts
+  # ====================
+  - name: system_health
+    interval: 30s
+    rules:
+      
+      - alert: ServiceUnhealthy
+        expr: service_health == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: health
+          tier: P1
+        annotations:
+          summary: "Service health check failed"
+          description: "{{ $labels.service }} is reporting unhealthy status"
+          runbook: "Check service logs and dependencies"
+      
+      - alert: HealthCheckFailing
+        expr: health_check_status == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: health
+          tier: P2
+        annotations:
+          summary: "Health check failing"
+          description: "{{ $labels.check }} is failing for {{ $labels.service }}"
+          runbook: "Investigate specific health check: {{ $labels.check }}"
+      
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+          tier: P3
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} for {{ $labels.service }}"
+          runbook: "Check for resource bottlenecks"
+      
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / node_memory_MemTotal_bytes > 0.9
+        for: 10m
+        labels:
+          severity: critical
+          component: system
+          tier: P2
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook: "Check for memory leaks, consider scaling"
+
+  # ====================
+  # Orchestrator Alerts
+  # ====================
+  - name: orchestrator
+    interval: 1m
+    rules:
+      
+      - alert: FrequentRollbacks
+        expr: increase(rollbacks_total[6h]) > 3
+        for: 5m
+        labels:
+          severity: critical
+          component: orchestrator
+          tier: P1
+        annotations:
+          summary: "Too many rollbacks"
+          description: "{{ $value }} rollbacks in past 6 hours"
+          runbook: "Investigate why new models are failing in production"
+      
+      - alert: HealingWorkflowStuck
+        expr: orchestrator_state == 2 and time() - timestamp(orchestrator_state) > 3600
+        for: 10m
+        labels:
+          severity: warning
+          component: orchestrator
+          tier: P2
+        annotations:
+          summary: "Healing workflow appears stuck"
+          description: "Orchestrator has been in same state for over 1 hour"
+          runbook: "Check orchestrator logs, may need manual intervention"
+
+  # ====================
+  # Data Quality Alerts
+  # ====================
+  - name: data_quality
+    interval: 5m
+    rules:
+      
+      - alert: HighMissingDataRate
+        expr: data_missing_rate > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          component: data
+          tier: P3
+        annotations:
+          summary: "High rate of missing data"
+          description: "{{ $value | humanizePercentage }} of data is missing"
+          runbook: "Check data pipeline, investigate data source issues"
+      
+      - alert: StaleData
+        expr: data_freshness_seconds > 3600
+        for: 10m
+        labels:
+          severity: warning
+          component: data
+          tier: P3
+        annotations:
+          summary: "Data is stale"
+          description: "Data was last updated {{ $value | humanizeDuration }} ago"
+          runbook: "Check data ingestion pipeline"
+
+  # ====================
+  # Business Metrics Alerts (Optional)
+  # ====================
+  - name: business_metrics
+    interval: 5m
+    rules:
+      
+      - alert: LowPredictionVolume
+        expr: rate(predictions_total[1h]) < 10
+        for: 30m
+        labels:
+          severity: info
+          component: business
+          tier: P4
+        annotations:
+          summary: "Low prediction volume"
+          description: "Only {{ $value }} predictions/sec in past hour"
+          runbook: "Check if this is expected, may indicate low usage"

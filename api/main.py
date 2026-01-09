@@ -25,6 +25,25 @@ import importlib.util
 import sys
 from pathlib import Path
 
+# Import monitoring components from training
+def _import_training_module(module_name, file_name):
+    """Import module from training directory."""
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        Path(__file__).parent.parent / "training" / file_name
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+metrics_module = _import_training_module("metrics_collector", "metrics_collector.py")
+alert_module = _import_training_module("alert_manager", "alert_manager.py")
+health_module = _import_training_module("health_checks", "health_checks.py")
+
+MetricsCollector = metrics_module.MetricsCollector
+AlertManager = alert_module.AlertManager
+HealthChecker = health_module.HealthChecker
+
 def _import_drift_detector():
     """Import DriftDetector from monitoring package outside api/"""
     spec = importlib.util.spec_from_file_location(
@@ -98,6 +117,11 @@ monitor = PerformanceMonitor()
 drift_detector = None  # Lazy loaded
 startup_time = time.time()
 
+# Initialize monitoring components
+metrics_collector = MetricsCollector(app_name="aqi_api")
+alert_manager = AlertManager()
+health_checker = HealthChecker(service_name="aqi_api")
+
 def get_drift_detector():
     """Lazy load drift detector"""
     global drift_detector
@@ -155,6 +179,26 @@ async def health_check():
         uptime_seconds=time.time() - startup_time
     )
 
+@app.get("/health/liveness", tags=["Health"])
+async def liveness_probe():
+    """Kubernetes liveness probe"""
+    return {"status": "alive" if health_checker.is_alive() else "dead"}
+
+@app.get("/health/readiness", tags=["Health"])
+async def readiness_probe():
+    """Kubernetes readiness probe"""
+    return {"status": "ready" if health_checker.is_ready() else "not_ready"}
+
+@app.get("/health/startup", tags=["Health"])
+async def startup_probe():
+    """Kubernetes startup probe"""
+    return {"status": "started" if health_checker.is_started() else "starting"}
+
+@app.get("/health/detailed", tags=["Health"])
+async def detailed_health():
+    """Detailed health status with all checks"""
+    return health_checker.get_status()
+
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
 async def predict(request: PredictionRequest):
     """
@@ -185,9 +229,18 @@ async def predict(request: PredictionRequest):
             response_time_ms=response_time
         )
         
-        # Record metrics
+        # Record metrics (both old and new)
         prediction_counter.inc()
         prediction_latency.observe(time.time() - start_time)
+        
+        # New metrics collector
+        duration = time.time() - start_time
+        metrics_collector.increment('predictions_total', labels={'model': model_manager.model_metadata.get('version', 'unknown')})
+        metrics_collector.observe('prediction_duration_seconds', duration)
+        metrics_collector.set_gauge('model_mae', monitor.calculate_metrics().get('mae', 0))
+        
+        # Check for alerts
+        alert_manager.check_and_alert(metrics_collector.get_summary())
         
         return PredictionResponse(
             predicted_aqi=round(predicted_aqi, 2),
@@ -230,8 +283,50 @@ async def submit_feedback(request: FeedbackRequest, background_tasks: Background
 
 @app.get("/metrics", tags=["Monitoring"])
 async def metrics():
-    """Prometheus metrics endpoint"""
+    """Prometheus metrics endpoint (legacy)"""
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/metrics/prometheus", tags=["Monitoring"])
+async def prometheus_metrics():
+    """New Prometheus metrics from MetricsCollector"""
+    combined = generate_latest().decode('utf-8')
+    combined += "\n" + metrics_collector.export()
+    combined += "\n" + health_checker.export_prometheus_format()
+    return Response(content=combined, media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/metrics/summary", tags=["Monitoring"])
+async def metrics_summary():
+    """Human-readable metrics summary"""
+    return metrics_collector.get_summary()
+
+@app.get("/alerts/active", tags=["Monitoring"])
+async def active_alerts():
+    """Get currently active alerts"""
+    alerts = alert_manager.get_active_alerts()
+    return {
+        "count": len(alerts),
+        "alerts": [{
+            "rule_name": a.rule_name,
+            "severity": a.severity,
+            "message": a.message,
+            "timestamp": a.timestamp
+        } for a in alerts]
+    }
+
+@app.get("/alerts/history", tags=["Monitoring"])
+async def alert_history(hours: int = 24):
+    """Get alert history"""
+    alerts = alert_manager.get_alert_history(hours=hours)
+    return {
+        "count": len(alerts),
+        "hours": hours,
+        "alerts": [{
+            "rule_name": a.rule_name,
+            "severity": a.severity,
+            "message": a.message,
+            "timestamp": a.timestamp
+        } for a in alerts]
+    }
 
 @app.get("/model/info", tags=["Model"])
 async def model_info():
