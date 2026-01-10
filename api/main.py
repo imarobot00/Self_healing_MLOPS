@@ -20,6 +20,7 @@ from schemas import (
 from model_loader import ModelManager
 from forecaster import AQIForecaster
 from monitoring import PerformanceMonitor
+from prediction_tracker import PredictionTracker
 
 # Import drift detector using importlib to avoid naming conflicts
 import importlib.util
@@ -117,6 +118,7 @@ forecaster = None
 monitor = PerformanceMonitor()
 drift_detector = None  # Lazy loaded
 startup_time = time.time()
+prediction_tracker = PredictionTracker(storage_dir=os.environ.get('PREDICTIONS_DIR', '/logs/predictions'))
 
 # Initialize monitoring components
 metrics_collector = MetricsCollector(app_name="aqi_api")
@@ -365,7 +367,7 @@ async def get_forecast(location_id: int = 6142174, hours: int = 5):
         forecasts = forecaster.forecast_next_hours(location_id, hours)
         current = forecaster.get_current_conditions(location_id)
         
-        # Log each forecast prediction for monitoring
+        # Log and save each forecast prediction
         for forecast in forecasts:
             monitor.log_prediction(
                 location_id=location_id,
@@ -375,7 +377,15 @@ async def get_forecast(location_id: int = 6142174, hours: int = 5):
                                'relativehumidity': forecast['humidity']},
                 model_version=model_manager.model_metadata.get('version', 'unknown')
             )
-            # Increment prediction counter for each forecast hour
+            # Save prediction for later evaluation against actuals
+            prediction_tracker.save_prediction(
+                location_id=location_id,
+                forecast_timestamp=forecast['timestamp'],
+                predicted_aqi=forecast['predicted_aqi'],
+                predicted_pm25=forecast['pm25'],
+                model_version=model_manager.model_metadata.get('version', 'unknown')
+            )
+            # Increment prediction counter
             prediction_counter.inc()
             metrics_collector.increment('predictions_total', labels={'model': model_manager.model_metadata.get('version', 'unknown')})
         
@@ -449,6 +459,32 @@ async def get_locations():
         })
     
     return {"locations": locations}
+
+@app.post("/evaluate-predictions", tags=["Monitoring"])
+async def evaluate_predictions():
+    """
+    Evaluate saved predictions against actual data.
+    Call this after git pull to compare predictions with new actual values.
+    """
+    try:
+        data_dir = os.environ.get('DATA_DIR', '../dataset')
+        result = prediction_tracker.evaluate_predictions(data_dir)
+        return result
+    except Exception as e:
+        logger.error(f"Error evaluating predictions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/prediction-accuracy", tags=["Monitoring"])
+async def get_prediction_accuracy():
+    """
+    Get summary of prediction accuracy - shows how well model predicted vs actual values.
+    """
+    try:
+        summary = prediction_tracker.get_evaluation_summary()
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting prediction accuracy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/monitoring/summary", tags=["Monitoring"])
 async def monitoring_summary():

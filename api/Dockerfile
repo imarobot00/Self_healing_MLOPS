@@ -45,6 +45,7 @@ COPY api/feature_engineer.py /api/
 COPY api/model_loader.py /api/
 COPY api/monitoring.py /api/
 COPY api/predict_and_validate.py /api/
+COPY api/prediction_tracker.py /api/
 
 # Copy monitoring components from training
 COPY training/metrics_collector.py /training/
