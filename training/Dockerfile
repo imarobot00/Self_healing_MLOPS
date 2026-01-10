@@ -48,6 +48,7 @@ COPY training/health_checks.py /training/
 COPY training/health_server.py /training/
 COPY training/run_training_service.py /training/
 COPY training/run_orchestrator_service.py /training/
+COPY training/retrain_model.py /training/
 
 # Copy shared dependencies from API
 COPY api/feature_engineer.py /api/

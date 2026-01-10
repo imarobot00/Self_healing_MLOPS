@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import json
 import dill
+import os
 from pathlib import Path
 from datetime import datetime, timedelta
 import sys
@@ -19,20 +20,39 @@ from river.forest import ARFRegressor
 from river.drift import ADWIN
 from river import metrics
 
-# Setup paths
+# Setup paths - use environment variables for Docker compatibility
 project_root = Path(__file__).parent.parent
-dataset_dir = project_root / "dataset"
-preprocessed_dir = dataset_dir / "preprocessed"
-models_dir = Path(__file__).parent / "models"
+dataset_dir = Path(os.environ.get('DATASET_DIR', project_root / "dataset"))
+preprocessed_dir = Path(os.environ.get('DATA_PATH', dataset_dir / "preprocessed"))
+models_dir = Path(os.environ.get('MODEL_PATH', Path(__file__).parent / "models"))
+
+# For Docker: preprocessing.py might be in /data
+preprocessing_paths = [
+    preprocessed_dir / "preprocessing.py",
+    Path("/data/preprocessing.py"),
+    dataset_dir / "preprocessed" / "preprocessing.py"
+]
 
 sys.path.insert(0, str(preprocessed_dir))
 
-# Import preprocessing
-import importlib.util
-spec = importlib.util.spec_from_file_location("preprocessing", preprocessed_dir / "preprocessing.py")
-preprocessing_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(preprocessing_module)
-StreamingPreprocessor = preprocessing_module.StreamingPreprocessor
+# Import preprocessing - try multiple paths
+StreamingPreprocessor = None
+for prep_path in preprocessing_paths:
+    if prep_path.exists():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("preprocessing", prep_path)
+        preprocessing_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(preprocessing_module)
+        StreamingPreprocessor = preprocessing_module.StreamingPreprocessor
+        break
+
+if StreamingPreprocessor is None:
+    # Fallback: create a simple preprocessor if not found
+    class StreamingPreprocessor:
+        def __init__(self):
+            self.feature_cols = ['pm25', 'pm1', 'temperature', 'relativehumidity', 'um003']
+        def process_record(self, record):
+            return {col: record.get(col, 0) for col in self.feature_cols}
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -150,10 +170,13 @@ def create_features_batch(df):
     logger.info(f"Processing {len(df)} records...")
     df_features = preprocessor.prepare_for_streaming(df, fit=True)
     
-    # Save preprocessing stats
-    stats_path = preprocessed_dir / "preprocessor_stats.json"
-    preprocessor.save_statistics(str(stats_path))
-    logger.info(f"Saved preprocessor stats to {stats_path}")
+    # Save preprocessing stats to writable location (logs directory)
+    stats_path = Path(os.environ.get('MODEL_PATH', models_dir)) / "preprocessor_stats.json"
+    try:
+        preprocessor.save_statistics(str(stats_path))
+        logger.info(f"Saved preprocessor stats to {stats_path}")
+    except OSError as e:
+        logger.warning(f"Could not save preprocessor stats: {e}")
     
     logger.info(f"Total records with features: {len(df_features)}")
     logger.info(f"Feature columns: {len(df_features.columns) - 1} (excluding target)")

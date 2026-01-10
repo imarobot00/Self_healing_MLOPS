@@ -112,6 +112,14 @@ prediction_counter = Counter('predictions_total', 'Total number of predictions')
 prediction_latency = Histogram('prediction_latency_seconds', 'Prediction latency')
 feedback_counter = Counter('feedback_total', 'Total feedback received')
 
+# Retraining metrics
+from prometheus_client import Gauge, Info
+retraining_required_gauge = Gauge('retraining_required', 'Whether retraining is required (1=yes, 0=no)')
+retraining_severity_gauge = Gauge('retraining_severity', 'Retraining severity level (0=ok, 1=warning, 2=high, 3=critical)')
+model_overall_mae_gauge = Gauge('model_overall_mae', 'Overall Mean Absolute Error of predictions')
+retraining_triggered_counter = Counter('retraining_triggered_total', 'Total number of times retraining was triggered')
+last_retraining_timestamp = Gauge('last_retraining_timestamp', 'Unix timestamp of last retraining trigger')
+
 # Global state
 model_manager = ModelManager(models_dir=os.environ.get('MODEL_PATH'))
 forecaster = None
@@ -191,6 +199,28 @@ async def health_check():
         model_version=model_manager.model_metadata.get('version', 'unknown'),
         uptime_seconds=time.time() - startup_time
     )
+
+@app.post("/reload-model", tags=["Health"])
+async def reload_model():
+    """
+    Manually reload the latest model.
+    Use this after retraining to immediately load the new model.
+    """
+    try:
+        old_version = model_manager.model_metadata.get('version', 'none')
+        model_manager.load_latest_model()
+        new_version = model_manager.model_metadata.get('version', 'none')
+        
+        return {
+            "status": "success",
+            "old_version": old_version,
+            "new_version": new_version,
+            "changed": old_version != new_version,
+            "message": f"Model updated from {old_version} to {new_version}" if old_version != new_version else "Already on latest model"
+        }
+    except Exception as e:
+        logger.error(f"Error reloading model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health/liveness", tags=["Health"])
 async def liveness_probe():
@@ -484,6 +514,127 @@ async def get_prediction_accuracy():
         return summary
     except Exception as e:
         logger.error(f"Error getting prediction accuracy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/retraining-status", tags=["Monitoring"])
+async def get_retraining_status():
+    """
+    Check if model retraining is required based on prediction accuracy.
+    
+    Returns:
+    - retraining_required: YES/NO
+    - reason: Why retraining is/isn't needed
+    - metrics: Current accuracy metrics
+    - thresholds: The thresholds used for decision
+    """
+    # Thresholds
+    MAE_WARNING = 25.0    # Warning if MAE > 25
+    MAE_CRITICAL = 35.0   # Critical if MAE > 35
+    ACCURACY_MIN = 70.0   # Minimum acceptable accuracy %
+    MIN_SAMPLES = 10      # Minimum samples needed for reliable decision
+    
+    try:
+        summary = prediction_tracker.get_evaluation_summary()
+        
+        if summary["total"] < MIN_SAMPLES:
+            # Update Prometheus metrics
+            retraining_required_gauge.set(0)
+            retraining_severity_gauge.set(0)
+            return {
+                "retraining_required": "UNKNOWN",
+                "confidence": "low",
+                "reason": f"Not enough data. Need {MIN_SAMPLES} evaluations, have {summary['total']}",
+                "recommendation": "Make more predictions and evaluate them",
+                "metrics": summary,
+                "thresholds": {
+                    "mae_warning": MAE_WARNING,
+                    "mae_critical": MAE_CRITICAL,
+                    "min_accuracy": ACCURACY_MIN,
+                    "min_samples": MIN_SAMPLES
+                }
+            }
+        
+        overall_mae = summary.get("overall_mae", 0)
+        
+        # Update MAE gauge
+        model_overall_mae_gauge.set(overall_mae)
+        
+        # Check locations with poor performance
+        poor_locations = []
+        for loc_id, data in summary.get("by_location", {}).items():
+            if data["mae"] > MAE_CRITICAL:
+                poor_locations.append({
+                    "location": loc_id,
+                    "mae": data["mae"],
+                    "samples": data["count"]
+                })
+        
+        # Decision logic
+        if overall_mae > MAE_CRITICAL:
+            status = "YES"
+            severity = "CRITICAL"
+            severity_num = 3
+            reason = f"Overall MAE ({overall_mae:.1f}) exceeds critical threshold ({MAE_CRITICAL})"
+        elif len(poor_locations) >= 2:
+            status = "YES"
+            severity = "HIGH"
+            severity_num = 2
+            reason = f"{len(poor_locations)} locations have MAE > {MAE_CRITICAL}: {[p['location'] for p in poor_locations]}"
+        elif overall_mae > MAE_WARNING:
+            status = "RECOMMENDED"
+            severity = "WARNING"
+            severity_num = 1
+            reason = f"Overall MAE ({overall_mae:.1f}) exceeds warning threshold ({MAE_WARNING})"
+        else:
+            status = "NO"
+            severity = "OK"
+            severity_num = 0
+            reason = f"Model performing well. MAE ({overall_mae:.1f}) is within acceptable range"
+        
+        # Update Prometheus metrics
+        retraining_required_gauge.set(1 if status in ["YES", "RECOMMENDED"] else 0)
+        retraining_severity_gauge.set(severity_num)
+        
+        return {
+            "retraining_required": status,
+            "severity": severity,
+            "reason": reason,
+            "overall_mae": overall_mae,
+            "poor_locations": poor_locations,
+            "total_evaluations": summary["total"],
+            "recommendation": "Run: docker exec mlops-training python /training/retrain_model.py" if status in ["YES", "RECOMMENDED"] else "No action needed",
+            "thresholds": {
+                "mae_warning": MAE_WARNING,
+                "mae_critical": MAE_CRITICAL,
+                "min_samples": MIN_SAMPLES
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error checking retraining status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/trigger-retraining", tags=["Monitoring"])
+async def trigger_retraining():
+    """
+    Trigger model retraining and record the event in Prometheus.
+    This endpoint is called when retraining is initiated.
+    """
+    try:
+        # Increment retraining counter
+        retraining_triggered_counter.inc()
+        
+        # Set last retraining timestamp
+        last_retraining_timestamp.set(time.time())
+        
+        logger.info("Retraining triggered and recorded in Prometheus")
+        
+        return {
+            "status": "triggered",
+            "timestamp": datetime.now().isoformat(),
+            "message": "Retraining event recorded. Run: docker exec mlops-training python /training/retrain_model.py"
+        }
+    except Exception as e:
+        logger.error(f"Error triggering retraining: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/monitoring/summary", tags=["Monitoring"])

@@ -1,5 +1,6 @@
 import dill
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -21,6 +22,41 @@ class ModelManager:
         self.current_model = None
         self.model_metadata = {}
         self.feature_engineer = FeatureEngineer()
+        self._last_check_time = None
+        self._check_interval = 60  # Check for new models every 60 seconds
+    
+    def _get_latest_model_path(self):
+        """Get path to the latest model file"""
+        model_files = sorted(self.models_dir.glob("arf_model_*.pkl"))
+        if not model_files:
+            return None
+        return model_files[-1]
+    
+    def check_for_new_model(self):
+        """Check if a newer model is available and load it"""
+        import time
+        current_time = time.time()
+        
+        # Only check periodically
+        if self._last_check_time and (current_time - self._last_check_time) < self._check_interval:
+            return False
+        
+        self._last_check_time = current_time
+        latest_path = self._get_latest_model_path()
+        
+        if latest_path is None:
+            return False
+        
+        # Check if it's a new model
+        current_version = self.model_metadata.get('version', '')
+        latest_version = latest_path.stem.replace('arf_model_', '')
+        
+        if latest_version != current_version:
+            logger.info(f"🔄 New model detected: {current_version} → {latest_version}")
+            self.load_model(latest_path)
+            return True
+        
+        return False
         
     def load_latest_model(self):
         """Load the most recent model"""
@@ -71,6 +107,9 @@ class ModelManager:
         if self.current_model is None:
             raise RuntimeError("No model loaded")
         
+        # Auto-check for new model (every 60 seconds)
+        self.check_for_new_model()
+        
         # Generate all 65 features from basic inputs
         logger.info(f"Generating features from {len(features)} basic inputs")
         full_features = self.feature_engineer.create_features(features, location_id)
@@ -79,7 +118,6 @@ class ModelManager:
         # Make prediction
         prediction = self.current_model.predict_one(full_features)
         return prediction
-        return self.current_model.predict_one(features)
     
     def update_model(self, features: dict, target: float):
         """Update model with new data (online learning)"""

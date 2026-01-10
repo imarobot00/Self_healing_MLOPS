@@ -4,12 +4,19 @@ Orchestrator Service - Long-Running Daemon
 
 Runs the self-healing orchestrator in a continuous loop with health checks.
 Designed for Docker containerization.
+
+Features:
+- Drift detection
+- Prediction accuracy monitoring  
+- Automatic retraining trigger
 """
 import os
 import sys
 import time
 import logging
 import threading
+import subprocess
+import requests
 from datetime import datetime
 from pathlib import Path
 
@@ -30,9 +37,56 @@ service_state = {
     'last_workflow': None,
     'check_count': 0,
     'heal_count': 0,
+    'retrain_count': 0,
     'error_count': 0,
     'started_at': datetime.now().isoformat()
 }
+
+
+def check_retraining_needed(api_url: str) -> dict:
+    """Check if retraining is needed by calling the API"""
+    try:
+        response = requests.get(f"{api_url}/retraining-status", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.warning(f"Failed to get retraining status: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.warning(f"Could not reach API for retraining status: {e}")
+        return None
+
+
+def trigger_retraining(api_url: str) -> bool:
+    """Trigger retraining via API and run the actual retraining"""
+    try:
+        # Record the trigger in API (for Prometheus)
+        requests.post(f"{api_url}/trigger-retraining", timeout=10)
+        
+        # Run the actual retraining
+        logger.info("🔧 Starting model retraining...")
+        
+        result = subprocess.run(
+            ["python", "/training/retrain_model.py"],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
+        )
+        
+        if result.returncode == 0:
+            logger.info("✅ Retraining completed successfully")
+            logger.info(result.stdout[-500:] if len(result.stdout) > 500 else result.stdout)
+            return True
+        else:
+            logger.error(f"❌ Retraining failed: {result.stderr}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        logger.error("❌ Retraining timed out after 10 minutes")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Retraining error: {e}")
+        return False
 
 
 def update_health_state(status: str, workflow_id: str = None, result: dict = None):
@@ -94,17 +148,54 @@ def run_orchestrator_loop():
                     'drift_info': result.get('drift_info', {})
                 })
             elif status == 'NO_DRIFT':
-                logger.info(f"✅ System healthy, no drift detected")
+                logger.info(f"✅ No drift detected")
                 update_health_state('running', workflow_id, {
                     'action': 'healthy',
                     'status': status
                 })
             else:
-                logger.info(f"📊 Check result: {status}")
+                logger.info(f"📊 Drift check result: {status}")
                 update_health_state('running', workflow_id, {
                     'action': 'checked',
                     'status': status
                 })
+            
+            # ============================================
+            # CHECK PREDICTION ACCURACY & AUTO-RETRAIN
+            # ============================================
+            logger.info("")
+            logger.info("📊 Checking prediction accuracy from API...")
+            
+            retrain_status = check_retraining_needed(api_url)
+            
+            if retrain_status:
+                retrain_required = retrain_status.get('retraining_required', 'NO')
+                severity = retrain_status.get('severity', 'OK')
+                overall_mae = retrain_status.get('overall_mae', 0)
+                
+                logger.info(f"   Retraining Required: {retrain_required}")
+                logger.info(f"   Severity: {severity}")
+                logger.info(f"   Overall MAE: {overall_mae:.2f}")
+                
+                if retrain_required in ['YES', 'RECOMMENDED']:
+                    logger.info("")
+                    logger.info("🚨 " + "=" * 50)
+                    logger.info(f"🚨 RETRAINING TRIGGERED - {severity}")
+                    logger.info(f"🚨 Reason: {retrain_status.get('reason', 'Unknown')}")
+                    logger.info("🚨 " + "=" * 50)
+                    
+                    # Trigger retraining
+                    success = trigger_retraining(api_url)
+                    
+                    if success:
+                        service_state['retrain_count'] += 1
+                        logger.info("✅ Retraining completed successfully!")
+                    else:
+                        logger.error("❌ Retraining failed!")
+                else:
+                    logger.info("✅ Model accuracy is acceptable, no retraining needed")
+            else:
+                logger.info("⚠️ Could not check retraining status (API unavailable)")
             
         except Exception as e:
             service_state['error_count'] += 1
@@ -114,6 +205,7 @@ def run_orchestrator_loop():
             update_health_state('error', result={'error': str(e)})
         
         # Sleep until next check
+        logger.info("")
         logger.info(f"💤 Sleeping for {check_interval}s until next check...")
         time.sleep(check_interval)
 

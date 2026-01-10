@@ -95,12 +95,14 @@ services:
       # Same volumes as training (shares registry, models, etc.)
       - ./training/models:/models
       - ./dataset/preprocessed:/data:ro
+      - ./dataset:/dataset:ro
       - ./training/logs:/logs
       - ./training/orchestrator_logs:/orchestrator_logs
       - ./training/registry.json:/registry.json
     environment:
       - MODEL_PATH=/models
       - DATA_PATH=/data
+      - DATASET_DIR=/dataset
       - API_URL=http://mlops-api:8000
       - TRAINING_URL=http://mlops-training:8001
       - ORCHESTRATOR_PORT=8002
