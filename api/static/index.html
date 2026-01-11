@@ -407,7 +407,7 @@
                     data.locations.forEach(loc => {
                         const option = document.createElement('option');
                         option.value = loc.id;
-                        option.textContent = `Location ${loc.id}`;
+                        option.textContent = loc.name || `Location ${loc.id}`;
                         select.appendChild(option);
                     });
                 }

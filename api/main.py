@@ -469,15 +469,15 @@ async def get_locations():
     # Location name mapping
     location_names = {
         3459: "Ratna Park",
-        5506835: "US Embassy",
-        5509787: "Pulchowk",
-        6093549: "Bhaisepati",
-        6093550: "Kirtipur",
-        6093551: "Lalitpur",
-        6133623: "Boudha",
-        6142022: "Thamel",
+        5506835: "Gaushala Chowk",
+        5509787: "Baluwatar",
+        6093549: "Golfutar",
+        6093550: "Tankeshwor",
+        6093551: "Teku",
+        6133623: "Jadibuti",
+        6142022: "Mid Baneshwor",
         6142174: "Ranibari",
-        6142175: "Chabahil"
+        6142175: "Sorakhutte"
     }
     
     locations = []
