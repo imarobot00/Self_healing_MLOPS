@@ -6,6 +6,9 @@ A production-ready, self-healing machine learning system for **Air Quality Index
 ![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
 ![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange)
 ![Grafana](https://img.shields.io/badge/Grafana-Dashboards-green)
+![River ML](https://img.shields.io/badge/River_ML-ARF-purple)
+![OpenAQ](https://img.shields.io/badge/OpenAQ-Data_Source-teal)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-black)
 
 ## 🎯 Features
 
@@ -30,6 +33,61 @@ A production-ready, self-healing machine learning system for **Air Quality Index
 | 6142175 | Sorakhutte | ✅ Active |
 | 5506835 | Gaushala Chowk | ✅ Active |
 | 3459 | Ratna Park | ✅ Active |
+
+## 🤖 The Model - Adaptive Random Forest (ARF)
+
+| Attribute | Details |
+|-----------|---------|
+| **Algorithm** | Adaptive Random Forest (ARF) |
+| **Library** | River ML |
+| **Type** | Online/Incremental Learning |
+| **Training Data** | 32,000+ samples |
+| **Features** | 62 engineered features |
+| **Target** | AQI (Air Quality Index) |
+
+### Why Adaptive Random Forest?
+
+- **Handles Concept Drift**: Automatically adapts to changing data patterns in air quality
+- **Online Learning**: Learns incrementally from streaming data without full retraining
+- **Memory Efficient**: Doesn't need to store entire dataset in memory
+- **Robust**: Ensemble method provides stable predictions
+
+### Feature Engineering (62 Features)
+
+| Category | Features |
+|----------|----------|
+| **Lag Features** | 1h, 2h, 3h, 6h, 12h, 24h previous values |
+| **Rolling Statistics** | Mean, Std, Min, Max over various windows |
+| **Cyclical Time** | Hour (sin/cos), Day (sin/cos), Month (sin/cos) |
+| **Interaction Features** | Cross-feature combinations |
+| **Location Encoding** | Station-specific identifiers |
+
+## 📡 Data Pipeline
+
+### Data Source: OpenAQ API
+
+- **Source**: [OpenAQ](https://openaq.org/) - Open Air Quality Data
+- **Coverage**: 10 monitoring stations in Kathmandu Valley
+- **Parameters**: PM2.5, PM1, Temperature, Humidity
+- **Update Frequency**: Hourly measurements
+
+### Automated Data Collection with GitHub Actions
+
+```yaml
+# .github/workflows/fetch_data.yml
+# Runs on schedule to fetch latest air quality data from OpenAQ
+```
+
+- **Scheduled Workflow**: Automatically fetches new data from OpenAQ API
+- **Storage**: Data stored in repository as JSON files
+- **Usage**: Pull latest data before prediction evaluation
+
+### Data Flow
+
+```
+OpenAQ API → GitHub Actions (scheduled fetch) → Repository → 
+Git Pull → Preprocessing → Model Training/Evaluation
+```
 
 ## 🏗️ Architecture
 
@@ -176,28 +234,31 @@ Response:
 2. Save to forecast_predictions.jsonl
        │
        ▼
-3. Git Pull (new actual data arrives)
+3. GitHub Actions fetches new data from OpenAQ (scheduled)
        │
        ▼
-4. POST /evaluate-predictions
+4. Git Pull (new actual data arrives)
        │
        ▼
-5. Calculate MAE per location
+5. POST /evaluate-predictions
        │
        ▼
-6. Orchestrator checks /retraining-status (every 3 min)
+6. Calculate MAE per location
        │
        ▼
-7. If MAE > threshold → Trigger Retraining
+7. Orchestrator checks /retraining-status (every 3 min)
        │
        ▼
-8. New model saved to /models
+8. If MAE > threshold → Trigger Retraining (ARF model)
        │
        ▼
-9. API auto-reloads new model (every 60 sec)
+9. New model saved to /models
        │
        ▼
-10. Back to step 1
+10. API auto-reloads new model (every 60 sec)
+       │
+       ▼
+11. Back to step 1
 ```
 
 ## 📊 Prometheus Metrics
@@ -238,10 +299,13 @@ Self Healing MLOps/
 │   ├── fetch_openaq_location.py  # OpenAQ data fetcher
 │   ├── merge_data.py             # Data merging
 │   ├── data_preprocessor.py      # Preprocessing pipeline
-│   ├── location_*.json           # Raw data files
+│   ├── location_*.json           # Raw data files (from OpenAQ)
 │   └── preprocessed/             # Processed datasets
 │       ├── train_data.csv
 │       └── test_data.csv
+│
+├── .github/workflows/            # GitHub Actions
+│   └── fetch_data.yml            # Scheduled data collection
 │
 ├── monitoring/                   # Monitoring stack
 │   ├── docker-compose.yml
@@ -372,6 +436,11 @@ docker exec mlops-training python /training/retrain_model.py
 3. Make your changes
 4. Submit a pull request
 
+## 🙏 Acknowledgments
+
+- **[OpenAQ](https://openaq.org/)** - For providing open air quality data
+- **[River ML](https://riverml.xyz/)** - For the Adaptive Random Forest implementation
+- **[FastAPI](https://fastapi.tiangolo.com/)** - For the excellent API framework
 
 ## 👤 Author
 
@@ -380,5 +449,7 @@ docker exec mlops-training python /training/retrain_model.py
 - GitHub: [@imarobot00](https://github.com/imarobot00)
 
 ---
+
+Built with ❤️ for cleaner air in Kathmandu Valley 🏔️
 
 Built with ❤️ for cleaner air in Kathmandu Metrpolitian city 🏔️

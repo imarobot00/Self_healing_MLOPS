@@ -1,0 +1,31 @@
+# One versioned prompt = one file. Git tracks its full history.
+id: aqi_advisor
+version: "1.0.0"
+
+# Which LLM this prompt is written for, and how "creative" it can be.
+model: llama-3.3-70b-versatile   # a free Groq model
+temperature: 0.3                 # low number = factual & consistent (good for health advice)
+
+# The fixed instructions that define the assistant's behaviour.
+system: |
+  You are an air-quality health advisor for Kathmandu Valley.
+  Use ONLY the air-quality data provided to answer.
+  Be concise, practical, and safety-first. If data is missing, say so.
+
+# The message we send per request. {aqi_context} and {question}
+# are blanks that get filled in at request time.
+template: |
+  Air quality data:
+  {aqi_context}
+
+  User question: {question}
+
+  Answer:
+
+# Notes for auditing — who made this and why.
+metadata:
+  author: bipul
+  created_at: "2026-09-01"
+  description: "First production prompt for the AQI advisory assistant."
+
+  
