@@ -49,3 +49,23 @@ class FeedbackRequest(BaseModel):
     features: PredictionRequest
     actual_aqi: float
     prediction_id: Optional[str] = None
+
+class AskRequest(BaseModel):
+    """A question for the AQI advisory LLM assistant."""
+    question: str = Field(..., description="The user's air-quality question")
+    aqi_context: str = Field(..., description="Air-quality data to ground the answer")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "question": "Is it safe to go for a run right now?",
+                "aqi_context": "Location: Mid Baneshwor. PM2.5: 82 µg/m³. Temperature: 24 c. Humidity: 61 %."
+            }
+        }
+
+class AskResponse(BaseModel):
+    """The assistant's answer, tagged with the prompt version that produced it."""
+    answer: str
+    prompt_version: str
+    prompt_hash: str
+    model: str

@@ -120,6 +120,36 @@ model_overall_mae_gauge = Gauge('model_overall_mae', 'Overall Mean Absolute Erro
 retraining_triggered_counter = Counter('retraining_triggered_total', 'Total number of times retraining was triggered')
 last_retraining_timestamp = Gauge('last_retraining_timestamp', 'Unix timestamp of last retraining trigger')
 
+from prometheus_client import Info
+from schemas import AskRequest, AskResponse
+
+# The llm/ package lives outside api/, so add it to the import path.
+_LLM_DIR = Path(__file__).parent.parent / "llm"
+if str(_LLM_DIR) not in sys.path:
+    sys.path.insert(0, str(_LLM_DIR))
+
+# Exposes the live prompt as `llm_prompt_version_info` in /metrics/prometheus.
+llm_prompt_version = Info('llm_prompt_version', 'Active LLM prompt version, hash, and model')
+
+# Set it once at startup using ONLY the registry (no LLM call, no groq needed).
+try:
+    from prompt_registry import PromptRegistry
+    _p = PromptRegistry().get_production("aqi_advisor")
+    llm_prompt_version.info({'version': _p['version'], 'hash': _p['hash'], 'model': _p['model']})
+    logger.info(f"LLM prompt version metric set: v{_p['version']} ({_p['hash']})")
+except Exception as e:
+    logger.warning(f"Could not set initial prompt version metric: {e}")
+
+# Load the assistant lazily (it needs groq) — only on the first /ask call.
+_aqi_assistant = None
+def get_assistant():
+    global _aqi_assistant
+    if _aqi_assistant is None:
+        from assistant import AQIAssistant
+        _aqi_assistant = AQIAssistant()
+    return _aqi_assistant
+
+
 # Global state
 model_manager = ModelManager(models_dir=os.environ.get('MODEL_PATH'))
 forecaster = None
@@ -325,6 +355,25 @@ async def submit_feedback(request: FeedbackRequest, background_tasks: Background
     except Exception as e:
         logger.error(f"Feedback error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ask", response_model=AskResponse, tags=["LLM"])
+async def ask(request: AskRequest):
+    """Ask the AQI advisory assistant, grounded in the provided air-quality context."""
+    try:
+        assistant = get_assistant()
+        result = assistant.ask(question=request.question, aqi_context=request.aqi_context)
+
+        # Refresh the metric with the version that actually served this request.
+        llm_prompt_version.info({
+            'version': result['prompt_version'],
+            'hash': result['prompt_hash'],
+            'model': result['model'],
+        })
+        return result
+    except Exception as e:
+        logger.error(f"/ask error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/metrics", tags=["Monitoring"])
 async def metrics():
