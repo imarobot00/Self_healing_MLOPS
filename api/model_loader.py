@@ -59,14 +59,22 @@ class ModelManager:
         return False
         
     def load_latest_model(self):
-        """Load the most recent model"""
+        """Load the most recent loadable model, skipping any corrupt files."""
         model_files = sorted(self.models_dir.glob("arf_model_*.pkl"))
-        
+
         if not model_files:
             raise FileNotFoundError(f"No models found in {self.models_dir}")
-        
-        latest_model_path = model_files[-1]
-        return self.load_model(latest_model_path)
+
+        # Try newest first; skip truncated/corrupt files so a bad latest model can't take down the API.
+        for model_path in reversed(model_files):
+            try:
+                return self.load_model(model_path)
+            except Exception as e:
+                logger.error(f"Skipping unloadable model {model_path.name}: {e}")
+
+        raise RuntimeError(
+            f"No loadable model found in {self.models_dir} ({len(model_files)} files tried)"
+        )
     
     def load_model(self, model_path: Path):
         """Load a specific model"""

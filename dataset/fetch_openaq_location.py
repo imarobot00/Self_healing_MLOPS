@@ -5,18 +5,23 @@ Fetch measurements for an OpenAQ location and save them as JSON.
 Usage:
   python fetch_openaq_location.py --location 3459 --output location_3459.json
 
-It will use the environment variable `OPENAQ_API_KEY` if set; otherwise it falls back
-to a built-in API key found in the user's notebook.
+It reads the API key from the environment variable `OPENAQ_API_KEY` (or a
+`dataset/.env` file), or from the --api-key argument.
 """
 import argparse
 import json
 import os
 import time
 import requests
+from pathlib import Path
 from typing import List, Dict
 
-# Default API key fallback (taken from the notebook in this workspace)
-DEFAULT_API_KEY = "e0f9842b3c8da78aa32e1b2489176fe50eb4ebe98dbdf07dca6a10449b68b9ad"
+# Load OPENAQ_API_KEY from dataset/.env when python-dotenv is available.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).with_name(".env"))
+except ImportError:
+    pass
 
 API_BASE = "https://api.openaq.org/v3"
 
@@ -113,7 +118,11 @@ def main():
     parser.add_argument("--api-key", "-k", type=str, default=None, help="OpenAQ API key (overrides env and fallback)")
     args = parser.parse_args()
 
-    api_key = args.api_key or os.getenv("OPENAQ_API_KEY") or DEFAULT_API_KEY
+    api_key = args.api_key or os.getenv("OPENAQ_API_KEY")
+    if not api_key:
+        raise SystemExit(
+            "OPENAQ_API_KEY is not set. Add it to dataset/.env or pass --api-key."
+        )
 
     print(f"Fetching measurements for location {args.location}...")
     try:

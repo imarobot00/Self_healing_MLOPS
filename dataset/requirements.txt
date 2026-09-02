@@ -1,6 +1,9 @@
 # Core dependencies
 requests>=2.31.0
 
+# Environment variable loading (.env)
+python-dotenv>=1.0.0
+
 # Scheduling
 APScheduler>=3.10.4
 

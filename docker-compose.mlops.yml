@@ -61,6 +61,10 @@ services:
       - ./training/validations:/validations
       - ./training/orchestrator_logs:/orchestrator_logs
       - ./training/registry.json:/registry.json
+      # Baseline stats for drift detection (read-only)
+      - ./monitoring/baseline_stats.json:/monitoring/baseline_stats.json:ro
+      # API prediction logs so drift detection can read recent predictions (read-only)
+      - ./api/logs:/api/logs:ro
     environment:
       - MODEL_PATH=/models
       - DATA_PATH=/data
@@ -99,6 +103,8 @@ services:
       - ./training/logs:/logs
       - ./training/orchestrator_logs:/orchestrator_logs
       - ./training/registry.json:/registry.json
+      # Baseline stats for drift detection (read-only)
+      - ./monitoring/baseline_stats.json:/monitoring/baseline_stats.json:ro
     environment:
       - MODEL_PATH=/models
       - DATA_PATH=/data

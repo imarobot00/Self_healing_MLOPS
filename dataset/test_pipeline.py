@@ -55,9 +55,18 @@ def test_api_connection():
     try:
         import requests
         import os
-        
-        api_key = os.getenv("OPENAQ_API_KEY", "e0f9842b3c8da78aa32e1b2489176fe50eb4ebe98dbdf07dca6a10449b68b9ad")
-        headers = {"X-API-Key": api_key} if api_key else {}
+        from pathlib import Path
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(Path(__file__).with_name(".env"))
+        except ImportError:
+            pass
+
+        api_key = os.getenv("OPENAQ_API_KEY")
+        if not api_key:
+            print("  ⚠ OPENAQ_API_KEY not set — skipping API connectivity test")
+            return False
+        headers = {"X-API-Key": api_key}
         
         response = requests.get(
             "https://api.openaq.org/v3/locations/3459",

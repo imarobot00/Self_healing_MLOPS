@@ -15,8 +15,13 @@ from pathlib import Path
 from typing import List, Dict, Optional, Set
 import requests
 
-# Default API key fallback
-DEFAULT_API_KEY = "e0f9842b3c8da78aa32e1b2489176fe50eb4ebe98dbdf07dca6a10449b68b9ad"
+# Load OPENAQ_API_KEY from dataset/.env when python-dotenv is available.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).with_name(".env"))
+except ImportError:
+    pass
+
 API_BASE = "https://api.openaq.org/v3"
 
 STATE_FILE = Path(__file__).parent / ".state.json"
@@ -26,9 +31,13 @@ class IncrementalLoader:
     """Handles incremental loading of OpenAQ measurements with state tracking."""
 
     def __init__(self, api_key: Optional[str] = None, data_dir: Optional[Path] = None):
-        self.api_key = api_key or os.getenv("OPENAQ_API_KEY") or DEFAULT_API_KEY
+        self.api_key = api_key or os.getenv("OPENAQ_API_KEY")
+        if not self.api_key:
+            raise ValueError(
+                "OPENAQ_API_KEY is not set. Add it to dataset/.env or pass --api-key."
+            )
         self.data_dir = data_dir or Path(__file__).parent
-        self.headers = {"X-API-Key": self.api_key} if self.api_key else {}
+        self.headers = {"X-API-Key": self.api_key}
         self.state = self._load_state()
 
     def _load_state(self) -> Dict:

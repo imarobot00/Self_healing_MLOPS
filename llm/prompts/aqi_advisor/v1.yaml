@@ -3,7 +3,7 @@ id: aqi_advisor
 version: "1.0.0"
 
 # Which LLM this prompt is written for, and how "creative" it can be.
-model: llama-3.3-70b-versatile   # a free Groq model
+model: openai/gpt-oss-120b       # free Groq model (replaces llama-3.3-70b-versatile, decommissioned 2026-08-16)
 temperature: 0.3                 # low number = factual & consistent (good for health advice)
 
 # The fixed instructions that define the assistant's behaviour.

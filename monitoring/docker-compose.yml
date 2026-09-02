@@ -14,7 +14,7 @@ services:
     container_name: mlops-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "9099:9090"  # host 9099 (9090 is taken by Langfuse MinIO); internal port stays 9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./alert_rules.yml:/etc/prometheus/alert_rules.yml

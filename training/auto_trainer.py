@@ -160,15 +160,23 @@ class AutoTrainer:
         # Check drift score
         try:
             drift_result = self.drift_detector.run_drift_check(days=7)
-            drift_score = drift_result['overall_drift_score']
-            reasons['drift_score'] = drift_score
-            reasons['drift_exceeded'] = drift_score > self.drift_threshold
-            
-            logger.info(f"Current drift score: {drift_score:.4f} (threshold: {self.drift_threshold})")
         except Exception as e:
-            logger.error(f"Error calculating drift score: {e}")
+            logger.error(f"Error running drift check: {e}")
             reasons['decision'] = 'error_drift_calculation'
             return False, reasons
+
+        # run_drift_check returns an error dict (no score) when the baseline or recent
+        # prediction data is missing — treat that as "can't decide", not a crash.
+        if 'overall_drift_score' not in drift_result:
+            reason = drift_result.get('error', 'drift score unavailable')
+            logger.warning(f"⏸️  Skipping drift check: {reason}")
+            reasons['decision'] = 'drift_data_unavailable'
+            return False, reasons
+
+        drift_score = drift_result['overall_drift_score']
+        reasons['drift_score'] = drift_score
+        reasons['drift_exceeded'] = drift_score > self.drift_threshold
+        logger.info(f"Current drift score: {drift_score:.4f} (threshold: {self.drift_threshold})")
         
         # Check time since last retrain
         if self.last_retrain_time:
