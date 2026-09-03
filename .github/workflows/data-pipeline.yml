@@ -38,7 +38,7 @@ jobs:
           OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
         run: |
           cd dataset
-          python incremental_loader.py --locations 3459 5506835 5509787 6093549 6093550 6093551 6133623 6142022 6142174 6142175 || exit 0
+          python incremental_loader.py --locations 3459 5506835 5509787 6093549 6093550 6093551 6133623 6142022 6142174 6142175
       
       - name: Commit and push changes
         run: |
