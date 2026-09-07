@@ -1,4 +1,32 @@
 # Drift Detection Configuration
+embedding_drift:
+  enabled: true
+
+  # Baseline embeddings (created by generate_embedding_baseline.py)
+  baseline_file: "monitoring/embedding_baseline.npz"
+
+  # Where the trace logger writes production queries
+  traces_dir: "logs/llm_traces"
+
+  # Analyze the most recent N traces
+  window_size: 200
+
+  # Skip the check below this many traces (avoid noisy stats on tiny samples)
+  min_samples: 20
+
+  thresholds:
+    # 1 - cos_sim(baseline_centroid, recent_centroid); calibrate after ~1 week of traffic
+    cosine_distance: 0.20
+    # MMD permutation test significance
+    mmd_p_value: 0.05
+
+  mmd:
+    n_permutations: 200
+    # null = median heuristic (sigma estimated from the data itself)
+    rbf_sigma: null
+
+  reporting:
+    reports_dir: "monitoring/reports"
 
 drift_detection:
   enabled: true
