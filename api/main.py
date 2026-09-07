@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -119,6 +121,24 @@ retraining_severity_gauge = Gauge('retraining_severity', 'Retraining severity le
 model_overall_mae_gauge = Gauge('model_overall_mae', 'Overall Mean Absolute Error of predictions')
 retraining_triggered_counter = Counter('retraining_triggered_total', 'Total number of times retraining was triggered')
 last_retraining_timestamp = Gauge('last_retraining_timestamp', 'Unix timestamp of last retraining trigger')
+llm_cosine_drift_gauge = Gauge('llm_embedding_cosine_drift', '1 - cosine similarity between baseline and recent query centroids')
+llm_mmd_score_gauge = Gauge('llm_embedding_mmd_score', 'MMD^2 between baseline and recent query embeddings')
+llm_mmd_pvalue_gauge = Gauge('llm_embedding_mmd_p_value', 'Permutation-test p-value for the MMD statistic')
+
+# Nightly drift job writes this file; the API relays it to Prometheus on scrape.
+_DRIFT_REPORT_PATH = Path(__file__).parent.parent / "monitoring" / "reports" / "embedding_drift_latest.json"
+
+def update_llm_drift_gauges():
+    #Refresh LLM Drift Gauges from the latest report
+    try:
+        report = json.loads(_DRIFT_REPORT_PATH.read_text(encoding="utf-8"))
+        if report.get("status") != "ok":
+            return  # insufficient_data etc. -> keep previous gauge values
+        llm_cosine_drift_gauge.set(report["cosine"]["cosine_distance"])
+        llm_mmd_score_gauge.set(report["mmd"]["mmd_squared"])
+        llm_mmd_pvalue_gauge.set(report["mmd"]["p_value"])
+    except Exception as e:
+        logger.warning(f"Could not relay embedding drift report: {e}")
 
 from prometheus_client import Info
 from schemas import AskRequest, AskResponse
@@ -380,9 +400,12 @@ async def metrics():
     """Prometheus metrics endpoint (legacy)"""
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
+
 @app.get("/metrics/prometheus", tags=["Monitoring"])
 async def prometheus_metrics():
     """New Prometheus metrics from MetricsCollector"""
+    update_llm_drift_gauges()
     combined = generate_latest().decode('utf-8')
     combined += "\n" + metrics_collector.export()
     combined += "\n" + health_checker.export_prometheus_format()

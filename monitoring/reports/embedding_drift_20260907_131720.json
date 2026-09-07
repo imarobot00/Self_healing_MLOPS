@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-09-07T13:17:20.562131+00:00",
+  "baseline_model": "all-MiniLM-L6-v2",
+  "status": "ok",
+  "num_recent_samples": 81,
+  "cosine": {
+    "cosine_similarity": 0.4442,
+    "cosine_distance": 0.5558,
+    "threshold": 0.2,
+    "drift_detected": true
+  },
+  "mmd": {
+    "mmd_squared": 0.133624,
+    "p_value": 0.005,
+    "sigma": 0.9444,
+    "n_permutations": 200,
+    "threshold_p_value": 0.05,
+    "drift_detected": true
+  },
+  "drift_detected": true
+}

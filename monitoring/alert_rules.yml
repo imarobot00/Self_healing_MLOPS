@@ -309,3 +309,34 @@ groups:
           summary: "Low prediction volume"
           description: "Only {{ $value }} predictions/sec in past hour"
           runbook: "Check if this is expected, may indicate low usage"
+
+    # ====================
+  # LLM Observability Alerts
+  # ====================
+  - name: llm_observability
+    interval: 1m
+    rules:
+
+      - alert: LLMQueryCentroidDrift
+        expr: llm_embedding_cosine_drift > 0.20
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+          tier: P3
+        annotations:
+          summary: "LLM query topic drift (centroid moved)"
+          description: "Cosine distance from baseline centroid is {{ $value }} (threshold 0.20)"
+          runbook: "Inspect recent traces; refresh embedding baseline if the new topics are legitimate"
+
+      - alert: LLMQueryDistributionShift
+        expr: llm_embedding_mmd_p_value < 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: llm
+          tier: P2
+        annotations:
+          summary: "LLM query distribution shift (MMD significant)"
+          description: "MMD permutation p-value is {{ $value }} — recent queries are statistically distinguishable from baseline"
+          runbook: "Review traces for new question categories; consider prompt update + baseline regeneration"
