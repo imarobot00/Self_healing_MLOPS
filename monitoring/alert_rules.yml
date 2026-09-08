@@ -340,3 +340,15 @@ groups:
           summary: "LLM query distribution shift (MMD significant)"
           description: "MMD permutation p-value is {{ $value }} — recent queries are statistically distinguishable from baseline"
           runbook: "Review traces for new question categories; consider prompt update + baseline regeneration"
+
+      - alert: LLMFaithfulnessLow
+        expr: llm_ragas_faithfulness < 0.7
+        for: 15m
+        labels:
+          severity: warning
+          component: llm
+          tier: P2
+        annotations:
+          summary: "LLM answers drifting from retrieved context (possible hallucination)"
+          description: "Nightly Ragas faithfulness is {{ $value }}, below 0.7 — answers contain claims unsupported by the AQI context"
+          runbook: "Inspect sampled_queries in monitoring/reports/ragas_latest.json; consider prompt rollback via registry"

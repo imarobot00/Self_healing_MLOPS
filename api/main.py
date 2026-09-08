@@ -125,6 +125,11 @@ llm_cosine_drift_gauge = Gauge('llm_embedding_cosine_drift', '1 - cosine similar
 llm_mmd_score_gauge = Gauge('llm_embedding_mmd_score', 'MMD^2 between baseline and recent query embeddings')
 llm_mmd_pvalue_gauge = Gauge('llm_embedding_mmd_p_value', 'Permutation-test p-value for the MMD statistic')
 
+llm_ragas_faithfulness_gauge = Gauge('llm_ragas_faithfulness', 'RAGAS faithfulness score for LLM responses')
+llm_ragas_answer_relevancy_gauge = Gauge('llm_ragas_answer_relevancy', 'RAGAS answer relevancy score for LLM responses')
+llm_ragas_context_precision_gauge = Gauge('llm_ragas_context_precision', 'RAGAS context precision score for LLM responses')
+
+
 # Nightly drift job writes this file; the API relays it to Prometheus on scrape.
 _DRIFT_REPORT_PATH = Path(__file__).parent.parent / "monitoring" / "reports" / "embedding_drift_latest.json"
 
@@ -139,6 +144,30 @@ def update_llm_drift_gauges():
         llm_mmd_pvalue_gauge.set(report["mmd"]["p_value"])
     except Exception as e:
         logger.warning(f"Could not relay embedding drift report: {e}")
+
+_RAGAS_REPORT_PATH = Path(__file__).parent.parent / "monitoring" / "reports" / "ragas_latest.json"
+
+# Ragas column names vary by version; map each gauge to the keys we might see.
+_RAGAS_KEY_MAP = {
+    llm_ragas_faithfulness_gauge: ("faithfulness",),
+    llm_ragas_answer_relevancy_gauge: ("answer_relevancy", "response_relevancy"),
+    llm_ragas_context_precision_gauge: ("llm_context_precision_without_reference", "context_precision"),
+}
+
+def update_llm_ragas_gauges():
+    # Refresh Ragas gauges from the latest nightly eval report
+    try:
+        report = json.loads(_RAGAS_REPORT_PATH.read_text(encoding="utf-8"))
+        scores = report.get("scores")
+        if report.get("status") != "ok" or not scores:
+            return  # no_new_traces etc. -> keep previous gauge values
+        for gauge, keys in _RAGAS_KEY_MAP.items():
+            for key in keys:
+                if key in scores:
+                    gauge.set(scores[key])
+                    break
+    except Exception as e:
+        logger.warning(f"Could not relay ragas report: {e}")
 
 from prometheus_client import Info
 from schemas import AskRequest, AskResponse
@@ -406,6 +435,7 @@ async def metrics():
 async def prometheus_metrics():
     """New Prometheus metrics from MetricsCollector"""
     update_llm_drift_gauges()
+    update_llm_ragas_gauges()
     combined = generate_latest().decode('utf-8')
     combined += "\n" + metrics_collector.export()
     combined += "\n" + health_checker.export_prometheus_format()

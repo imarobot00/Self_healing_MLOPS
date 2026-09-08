@@ -4,3 +4,9 @@ PyYAML>=6.0.1
 python-dotenv>=1.0.0
 sentence-transformers>=3.0.0
 numpy>=1.26.0
+# pinned: ragas 0.4.x requires langchain-community>=0.4, which dropped a module
+# ragas 0.4.x still imports internally (langchain_community.chat_models.vertexai)
+ragas==0.2.15
+langchain-community<0.4
+langchain-groq<0.3
+langchain-huggingface<0.2

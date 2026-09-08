@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-09-08T12:12:35.352243+00:00",
+  "judge_model": "openai/gpt-oss-120b",
+  "num_new_traces": 6,
+  "status": "ok",
+  "num_sampled": 3,
+  "scores": {
+    "faithfulness": 0.0496,
+    "faithfulness_n": 3,
+    "answer_relevancy": 0.5672,
+    "answer_relevancy_n": 3,
+    "llm_context_precision_without_reference": 1.0,
+    "llm_context_precision_without_reference_n": 3
+  },
+  "sampled_queries": [
+    "What does PM2.5 of 82 actually mean?",
+    "Is it safe to go for a run right now?",
+    "Should my child wear a mask to school?"
+  ]
+}
