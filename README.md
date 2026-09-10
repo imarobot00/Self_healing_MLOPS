@@ -12,6 +12,67 @@ A production-ready, self-healing machine learning system for **Air Quality Index
 
 ## 🎯 Features
 
+### LLM Observability and Shadow Evaluation
+
+The AQI assistant has Git-backed prompts, JSONL traces, embedding drift checks,
+and nightly Ragas evaluation. The Day 5 challenger is `llm/prompts/aqi_advisor/v2.yaml`.
+It is **shadow-only**: `/ask` continues to use the production pointer unchanged.
+The nightly sampler replays selected real questions with their original context,
+logs the original and challenger answers together, and evaluates both offline.
+No challenger answer is returned to a user and no automatic promotion occurs.
+
+```bash
+# From the repository root, with GROQ_API_KEY in the root .env:
+.venv/bin/python -m pip install -r llm/requirements.txt
+.venv/bin/python -m unittest llm.eval.test_shadow_runner api.test_llm_report_metrics -v
+.venv/bin/python llm/eval/ragas_sampler.py
+```
+
+Sampler settings are in `llm/eval/ragas_sampler.py`: `shadow_enabled`,
+`challenger_version`, and the reserved `canary_pct=0`. Nonzero canary percentages
+are rejected. Sampling is 1%, with a floor of 3 and a ceiling of 10, capped by
+available new traces. Shadow mode increases API usage: each sampled question adds
+a challenger generation and a second evaluation. Ragas metrics may use multiple
+judge calls; this is a trace budget, not a hard token or request budget.
+
+The existing local `llm-ragas-eval.timer` invokes this sampler at 03:30, with
+persistent catch-up after login. Timer files are machine-local, not installed by
+cloning this repository. Inspect them with `systemctl --user cat llm-ragas-eval.timer`
+and `systemctl --user cat llm-ragas-eval.service`. GitHub-hosted runners cannot read
+local private traces unless a separate secure data transport is configured.
+
+Outputs:
+- `logs/llm_shadow/shadow_*.jsonl`: private paired answers, context, versions, hashes,
+       and latency. Kept outside the production trace directory to prevent resampling.
+- `monitoring/reports/shadow_latest.json`: aggregate paired scores and challenger
+       minus champion differences, written only after all pairs have all metric scores.
+- `monitoring/reports/ragas_latest.json`: last scored production evaluation;
+       idle or failed runs no longer replace it. Incomplete shadow runs fail without
+       advancing the watermark. Retrying can repeat API calls, so execution is not
+       exactly-once. Existing already-processed traces are not replayed automatically.
+
+Grafana provisions `monitoring/grafana/dashboards/llm_observability.json` as
+**AQI Assistant - LLM Observability** in the MLOps folder. It uses the existing
+Prometheus datasource and shows prompt metadata, cosine/MMD trends, Ragas trends,
+paired shadow scores, differences, sample count, and report age. Restart/redeploy
+the API to load the new metric relay. Its process must see the same
+`monitoring/reports` directory as the nightly jobs; the existing container setup
+does not automatically share workstation reports. An empty panel is not a zero
+score. Check datasource connectivity, `/metrics/prometheus`, and report age.
+
+The monitoring Compose file uses Grafana port 3000, which can conflict with
+Langfuse. Use a free host port before launching that stack; do not stop unrelated
+services to free it. Dashboard JSON can also be imported into an existing Grafana.
+
+Evaluation limitations: a high context-precision score and low faithfulness are
+not contradictory. Context may be relevant while failing to support an answer's
+extra claims. Sparse measurement-only context cannot ground broad health advice.
+Judge parsing issues require evidence; do not dismiss low scores as artifacts.
+The judge currently shares the assistant's model family, which can introduce bias.
+Review paired traces and use held-out questions before considering promotion.
+No statistically reliable quality improvement is claimed from a tiny sample.
+
+
 - **Real-time AQI Forecasting** - 5-hour ahead predictions using Adaptive Random Forest
 - **Self-Healing Pipeline** - Automatic retraining when model accuracy degrades
 - **Multi-Location Support** - 10 monitoring stations across Kathmandu Valley

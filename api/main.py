@@ -128,6 +128,9 @@ llm_mmd_pvalue_gauge = Gauge('llm_embedding_mmd_p_value', 'Permutation-test p-va
 llm_ragas_faithfulness_gauge = Gauge('llm_ragas_faithfulness', 'RAGAS faithfulness score for LLM responses')
 llm_ragas_answer_relevancy_gauge = Gauge('llm_ragas_answer_relevancy', 'RAGAS answer relevancy score for LLM responses')
 llm_ragas_context_precision_gauge = Gauge('llm_ragas_context_precision', 'RAGAS context precision score for LLM responses')
+llm_ragas_report_timestamp = Gauge('llm_ragas_report_timestamp_seconds', 'Timestamp of latest scored Ragas report')
+from llm_report_metrics import ShadowMetrics
+_shadow_metrics = ShadowMetrics(Path(__file__).resolve().parent.parent / "monitoring" / "reports")
 
 
 # Nightly drift job writes this file; the API relays it to Prometheus on scrape.
@@ -156,6 +159,9 @@ _RAGAS_KEY_MAP = {
 
 def update_llm_ragas_gauges():
     # Refresh Ragas gauges from the latest nightly eval report
+    for gauge in _RAGAS_KEY_MAP:
+        gauge.set(float("nan"))
+    llm_ragas_report_timestamp.set(float("nan"))
     try:
         report = json.loads(_RAGAS_REPORT_PATH.read_text(encoding="utf-8"))
         scores = report.get("scores")
@@ -166,6 +172,7 @@ def update_llm_ragas_gauges():
                 if key in scores:
                     gauge.set(scores[key])
                     break
+        llm_ragas_report_timestamp.set(datetime.fromisoformat(report["timestamp"]).timestamp())
     except Exception as e:
         logger.warning(f"Could not relay ragas report: {e}")
 
@@ -436,6 +443,7 @@ async def prometheus_metrics():
     """New Prometheus metrics from MetricsCollector"""
     update_llm_drift_gauges()
     update_llm_ragas_gauges()
+    _shadow_metrics.update()
     combined = generate_latest().decode('utf-8')
     combined += "\n" + metrics_collector.export()
     combined += "\n" + health_checker.export_prometheus_format()

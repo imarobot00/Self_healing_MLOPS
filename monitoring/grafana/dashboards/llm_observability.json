@@ -1,0 +1,82 @@
+{
+  "uid": "llm-observability",
+  "title": "AQI Assistant - LLM Observability",
+  "tags": ["mlops", "llm", "shadow"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {"from": "now-7d", "to": "now"},
+  "templating": {"list": [{"name": "datasource", "label": "Prometheus", "type": "datasource", "query": "prometheus", "refresh": 1}]},
+  "panels": [
+    {
+      "id": 1, "title": "Production Prompt", "type": "table",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 5},
+      "targets": [{"refId": "A", "expr": "llm_prompt_version_info", "instant": true, "format": "table"}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}}}]
+    },
+    {
+      "id": 2, "title": "Evaluation Age", "type": "stat",
+      "description": "Age of last scored report; missing scores are unavailable, not zero. Nightly scheduling is local to the workstation.",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 5},
+      "targets": [
+        {"refId": "A", "expr": "time() - llm_ragas_report_timestamp_seconds", "legendFormat": "Production eval", "instant": true},
+        {"refId": "B", "expr": "time() - llm_shadow_report_timestamp_seconds", "legendFormat": "Shadow eval", "instant": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "noValue": "Not evaluated", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 172800}]}}, "overrides": []}
+    },
+    {
+      "id": 3, "title": "Query Centroid Drift", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 0, "y": 5, "w": 12, "h": 8},
+      "targets": [{"refId": "A", "expr": "llm_embedding_cosine_drift", "legendFormat": "Cosine distance"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.2}]}, "custom": {"thresholdsStyle": {"mode": "line"}}}, "overrides": []}
+    },
+    {
+      "id": 4, "title": "Query Distribution Drift (MMD)", "type": "timeseries",
+      "description": "Unbiased MMD squared can be negative. Compare the permutation p-value to its configured threshold, not to the MMD score.",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 12, "y": 5, "w": 12, "h": 8},
+      "targets": [
+        {"refId": "A", "expr": "llm_embedding_mmd_score", "legendFormat": "MMD squared"},
+        {"refId": "B", "expr": "llm_embedding_mmd_p_value", "legendFormat": "Permutation p-value"}
+      ]
+    },
+    {
+      "id": 5, "title": "Production Answer Evaluation", "type": "timeseries",
+      "description": "Faithfulness measures support in supplied context, not general truth. Relevant context can still fail to support additional claims.",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 0, "y": 13, "w": 24, "h": 8},
+      "targets": [
+        {"refId": "A", "expr": "llm_ragas_faithfulness", "legendFormat": "Faithfulness"},
+        {"refId": "B", "expr": "llm_ragas_answer_relevancy", "legendFormat": "Answer relevancy"},
+        {"refId": "C", "expr": "llm_ragas_context_precision", "legendFormat": "Context precision"}
+      ],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit"}, "overrides": []}
+    },
+    {
+      "id": 6, "title": "Paired Shadow Evaluation", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 0, "y": 21, "w": 12, "h": 8},
+      "targets": [{"refId": "A", "expr": "llm_shadow_score", "legendFormat": "{{variant}} / {{metric}}"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit"}, "overrides": []}
+    },
+    {
+      "id": 7, "title": "Challenger Minus Champion", "type": "timeseries",
+      "description": "Positive values favor the challenger on the same sampled traces. This is not an automatic promotion decision.",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 12, "y": 21, "w": 12, "h": 8},
+      "targets": [{"refId": "A", "expr": "llm_shadow_delta", "legendFormat": "{{metric}}"}],
+      "fieldConfig": {"defaults": {"min": -1, "max": 1}, "overrides": []}
+    },
+    {
+      "id": 8, "title": "Evaluated Pairs", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "gridPos": {"x": 0, "y": 29, "w": 6, "h": 4},
+      "targets": [{"refId": "A", "expr": "llm_shadow_pairs", "instant": true}],
+      "fieldConfig": {"defaults": {"decimals": 0, "noValue": "Not evaluated"}, "overrides": []}
+    }
+  ]
+}

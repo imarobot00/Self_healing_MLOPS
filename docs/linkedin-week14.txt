@@ -1,0 +1,26 @@
+I extended my Kathmandu air-quality MLOps project with an LLM observability layer.
+
+The assistant now has versioned prompts, query traces, embedding drift checks,
+and sampled offline Ragas evaluation. This week's addition is a shadow-only
+challenger: replay a production question with the same context, keep both answers,
+and compare their scores without serving the challenger to the user.
+
+The Grafana dashboard brings together prompt metadata, drift, answer evaluation,
+paired score differences, sample counts, and evaluation freshness.
+
+Two lessons stood out:
+
+1. A successful process exit does not guarantee a successful evaluation. Failed
+judgments must not advance the processing watermark and silently skip traffic.
+
+2. Relevant context is not necessarily sufficient context. An AQI measurement
+can be relevant to a health question without supporting every claim in an answer.
+That is why low faithfulness needs investigation, not an automatic explanation.
+
+This is a portfolio prototype, not a claim of production-grade medical advice.
+The challenger stays offline, canary traffic remains at zero, and promotion still
+requires human review and stronger evaluation evidence.
+
+Code: https://github.com/imarobot00/Self_healing_MLOPS
+
+#MLOps #LLMOps #MachineLearning #Observability #BuildInPublic
