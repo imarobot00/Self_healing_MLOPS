@@ -412,8 +412,13 @@ async def submit_feedback(request: FeedbackRequest, background_tasks: Background
         logger.error(f"Feedback error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/chat", tags=["LLM"])
+def chat_dashboard():
+    return FileResponse(Path(__file__).parent / "static" / "chat.html")
+
+
 @app.post("/ask", response_model=AskResponse, tags=["LLM"])
-async def ask(request: AskRequest):
+def ask(request: AskRequest):
     """Ask the AQI advisory assistant, grounded in the provided air-quality context."""
     try:
         assistant = get_assistant()
@@ -428,7 +433,7 @@ async def ask(request: AskRequest):
         return result
     except Exception as e:
         logger.error(f"/ask error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="The assistant is temporarily unavailable. Please try again.")
 
 
 @app.get("/metrics", tags=["Monitoring"])
