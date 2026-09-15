@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AQI Assistant</title>
+  <style>
+    :root{--ink:#202c2a;--muted:#596b67;--accent:#126953;--line:#d6e1dc;--paper:#fff}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);font:16px 'Segoe UI',sans-serif;background:linear-gradient(120deg,#f1f7f4,#f4f6fa);letter-spacing:0}
+    header{background:var(--paper);border-bottom:1px solid var(--line);padding:18px 28px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+    h1{font:600 25px Georgia,serif;margin:0}nav{display:flex;gap:20px}a{color:var(--accent)}main{max-width:1160px;margin:auto;display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100dvh - 74px)}
+    aside{padding:28px 24px;border-right:1px solid var(--line)}h2{font-size:17px;margin:0 0 22px}label{display:block;font-weight:600;font-size:14px;margin-bottom:10px}textarea{width:100%;resize:vertical;border:1px solid #9aafa7;border-radius:6px;padding:12px;font:inherit;color:var(--ink);background:white;line-height:1.5}textarea:focus{outline:2px solid var(--accent);outline-offset:2px}#context{min-height:210px}
+    .note{font-size:13px;color:var(--muted);line-height:1.6}section{padding:26px;min-width:0;display:flex;flex-direction:column;gap:20px}.toolbar{display:flex;justify-content:space-between;align-items:center}.toolbar h2{margin:0}button{border:0;background:var(--accent);color:white;padding:12px 18px;border-radius:6px;cursor:pointer;font:600 14px 'Segoe UI',sans-serif}button:disabled{opacity:.5;cursor:wait}.secondary{background:white;color:var(--ink);border:1px solid var(--line)}
+    #messages{flex:1;min-height:280px;max-height:56dvh;overflow:auto;padding:4px;scroll-behavior:smooth}.empty{padding:60px 0;text-align:center;color:var(--muted)}.empty strong{display:block;font:24px Georgia,serif;color:var(--ink);margin-bottom:14px}.message{padding:16px 18px;margin:0 0 18px;border-left:3px solid var(--accent);background:white;overflow-wrap:anywhere}.message.user{border-color:#c29132;background:#fcfaf4}.role{font-size:12px;text-transform:uppercase;letter-spacing:0;font-weight:bold;color:var(--muted);margin-bottom:9px}.body{white-space:pre-wrap;line-height:1.6}.body p{margin:0 0 10px}.body p:last-child{margin-bottom:0}.body ul,.body ol{margin:6px 0 10px;padding-left:22px}.body li{margin:3px 0}.body h3,.body h4,.body h5,.body h6{margin:12px 0 6px;font-size:15px}.body table{border-collapse:collapse;margin:8px 0 12px;font-size:14px;max-width:100%;display:block;overflow-x:auto}.body th,.body td{border:1px solid var(--line);padding:6px 10px;text-align:left;white-space:nowrap}.body th{background:#eef4f1;font-weight:600}.body code{background:#eef2f0;padding:1px 5px;border-radius:3px;font-size:13px}.meta{font-size:12px;color:var(--muted);margin-top:12px}form{border-top:1px solid var(--line);padding-top:20px} .actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}#status{color:var(--muted);font-size:14px}#error{color:#a12e2e;line-height:1.5;margin-top:12px}footer{font-size:12px;color:var(--muted)}
+    @media(max-width:700px){header{padding:16px}main{display:block}aside{border-right:0;border-bottom:1px solid var(--line);padding:20px}#context{min-height:110px}section{padding:20px}#messages{max-height:50dvh;min-height:200px}nav{gap:14px;font-size:14px}}
+    @media(prefers-reduced-motion:reduce){#messages{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header><h1>AQI Assistant</h1><nav aria-label="Main navigation"><a href="/forecast-ui">Forecasts</a><a href="/monitoring">Monitoring</a><a href="/docs">API</a></nav></header>
+  <main>
+    <aside><h2>Air-quality context</h2>
+      <label for="location">Load live forecast for a station</label>
+      <select id="location" style="width:100%;padding:11px;border:1px solid #9aafa7;border-radius:6px;font:inherit;background:white;margin-bottom:16px"><option value="">-- Choose a location --</option></select>
+      <label for="context">Location, measurements and timestamp</label><textarea id="context" maxlength="12000" placeholder="Pick a location above, or type your own measurements here"></textarea><p class="note" id="context-note">Pick a station to auto-fill from the forecast model, or paste your own measurements.</p><p class="note">Questions and context are sent to Groq and recorded in local evaluation logs. Do not include personal or sensitive information.</p></aside>
+    <section aria-label="Chat">
+      <div class="toolbar"><h2>Conversation</h2><button id="clear" type="button" class="secondary">New conversation</button></div>
+      <div id="messages" role="log" aria-live="polite" aria-label="Messages"><div class="empty"><strong>What would you like to know?</strong>Air quality, outdoor plans, and your measurements.</div></div>
+      <form id="chat-form"><label for="question">Your question</label><textarea id="question" rows="2" maxlength="2000" required placeholder="What do these measurements mean?"></textarea><div class="actions"><span id="status" role="status">Ready</span><button id="send" type="submit">Send question</button></div><div id="error" role="alert" hidden></div></form>
+      <footer>Each answer uses your question and the supplied context, not previous messages. Not medical advice.</footer>
+    </section>
+  </main>
+  <script>
+    // Escape HTML first so model output can never inject markup; then apply a small markdown subset.
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+    function inline(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*(?!\*)([^*\n]+?)\*(?!\*)/g,'$1<em>$2</em>').replace(/`([^`]+)`/g,'<code>$1</code>')}
+    function renderMarkdown(md){
+      const lines=md.split('\n'), out=[];let i=0;
+      while(i<lines.length){
+        const l=lines[i];
+        if(/^\s*\|.*\|\s*$/.test(l)&&i+1<lines.length&&/^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1])){
+          const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>inline(c.trim()));
+          let h='<table><thead><tr>'+cells(l).map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';i+=2;
+          while(i<lines.length&&/^\s*\|.*\|\s*$/.test(lines[i])){h+='<tr>'+cells(lines[i]).map(c=>'<td>'+c+'</td>').join('')+'</tr>';i++}
+          out.push(h+'</tbody></table>');continue}
+        if(/^\s*[-*•]\s+/.test(l)){let h='<ul>';while(i<lines.length&&/^\s*[-*•]\s+/.test(lines[i])){h+='<li>'+inline(lines[i].replace(/^\s*[-*•]\s+/,''))+'</li>';i++}out.push(h+'</ul>');continue}
+        if(/^\s*\d+[.)]\s+/.test(l)){let h='<ol>';while(i<lines.length&&/^\s*\d+[.)]\s+/.test(lines[i])){h+='<li>'+inline(lines[i].replace(/^\s*\d+[.)]\s+/,''))+'</li>';i++}out.push(h+'</ol>');continue}
+        const hm=l.match(/^(#{1,4})\s+(.*)/);if(hm){out.push('<h'+(hm[1].length+2)+'>'+inline(hm[2])+'</h'+(hm[1].length+2)+'>');i++;continue}
+        if(l.trim()===''){i++;continue}
+        let p=[];while(i<lines.length&&lines[i].trim()!==''&&!/^\s*([-*•]|\d+[.)])\s+|^\s*\||^#{1,4}\s/.test(lines[i])){p.push(inline(lines[i]));i++}
+        if(p.length)out.push('<p>'+p.join('<br>')+'</p>')
+      }
+      return out.join('')
+    }
+    const location_=document.getElementById('location'), contextNote=document.getElementById('context-note');
+    fetch('/locations').then(r=>r.json()).then(d=>{
+      for(const l of d.locations.sort((a,b)=>a.name.localeCompare(b.name))){const o=document.createElement('option');o.value=l.id;o.textContent=l.name;location_.append(o)}
+    }).catch(()=>{contextNote.textContent='Could not load station list; paste measurements manually.'});
+    location_.addEventListener('change',async()=>{
+      if(!location_.value)return;
+      const name=location_.options[location_.selectedIndex].textContent;
+      contextNote.textContent='Loading forecast for '+name+'...';context.value='';
+      try{
+        const r=await fetch('/forecast?location_id='+location_.value);if(!r.ok)throw new Error();
+        const f=await r.json(), c=f.current_conditions||{};
+        const lines=[`Location: ${name}`,
+          `Current conditions (as of ${c.timestamp||'unknown'}): PM2.5 ${c.pm25} ug/m3, PM1 ${c.pm1} ug/m3, AQI ${c.aqi} (${c.aqi_category}), temperature ${c.temperature} C, humidity ${c.relativehumidity}%`,
+          `Model forecast (Adaptive Random Forest, version ${f.model_version}):`];
+        for(const h of f.forecasts||[])lines.push(`  +${h.hour}h (${h.timestamp}): predicted AQI ${h.predicted_aqi} (${h.aqi_category}), PM2.5 ${h.pm25} ug/m3`);
+        lines.push('Note: forecasts are model predictions with uncertainty, not measurements.');
+        context.value=lines.join('\n');contextNote.textContent='Loaded from the forecast model. You can edit this before asking.';
+      }catch{contextNote.textContent='Forecast unavailable for '+name+'; paste measurements manually.'}
+    });
+    const form=document.getElementById('chat-form'), question=document.getElementById('question'), context=document.getElementById('context'), messages=document.getElementById('messages'), send=document.getElementById('send'), clear=document.getElementById('clear'), status=document.getElementById('status'), error=document.getElementById('error');
+    function addMessage(role,text,meta=''){
+      messages.querySelector('.empty')?.remove();
+      const item=document.createElement('article');item.className='message '+role;
+      const heading=document.createElement('div');heading.className='role';heading.textContent=role==='user'?'You':'AQI Assistant';
+      const body=document.createElement('div');body.className='body';
+      if(role==='assistant'){body.innerHTML=renderMarkdown(text);body.style.whiteSpace='normal'}else{body.textContent=text}
+      item.append(heading,body);
+      if(meta){const detail=document.createElement('div');detail.className='meta';detail.textContent=meta;item.append(detail)}
+      messages.append(item);item.scrollIntoView({block:'nearest'});return item;
+    }
+    clear.addEventListener('click',()=>{messages.replaceChildren();question.value='';error.hidden=true;status.textContent='Ready';question.focus()});
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();const text=question.value.trim(), grounding=context.value.trim();
+      if(!text)return;
+      if(!grounding){error.textContent='Add air-quality context before sending a question.';error.hidden=false;context.focus();return}
+      error.hidden=true;send.disabled=true;clear.disabled=true;question.disabled=true;status.textContent='Thinking...';
+      const pending=addMessage('user',text);
+      const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),180000);
+      try{
+        const response=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text,aqi_context:grounding}),signal:controller.signal});
+        if(!response.ok)throw new Error(response.status===422?'Check the question and context length.':'The assistant is unavailable. Please try again.');
+        const result=await response.json();if(typeof result.answer!=='string')throw new Error('The server returned an invalid answer.');
+        addMessage('assistant',result.answer,`Prompt ${result.prompt_version} | ${result.model}`);question.value='';status.textContent='Ready';
+      }catch(problem){pending.remove();error.textContent=problem.name==='AbortError'?'The request timed out. Please try again.':problem.message;error.hidden=false;status.textContent='Not sent'}
+      finally{clearTimeout(timeout);send.disabled=false;clear.disabled=false;question.disabled=false;question.focus()}
+    });
+  </script>
+</body>
+</html>

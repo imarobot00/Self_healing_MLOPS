@@ -20,6 +20,12 @@ services:
       - ./api/logs:/logs
       # Mount dataset for forecasting
       - ./dataset:/dataset:ro
+      # Nightly LLM eval reports (drift/ragas/shadow) relayed to Prometheus
+      - ./monitoring/reports:/monitoring/reports:ro
+      # LLM traces written by /ask
+      - ./logs/llm_traces:/logs/llm_traces
+    env_file:
+      - .env
     environment:
       - MODEL_PATH=/models
       - DATA_DIR=/dataset

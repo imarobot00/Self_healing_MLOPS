@@ -46,6 +46,11 @@ COPY api/model_loader.py /api/
 COPY api/monitoring.py /api/
 COPY api/predict_and_validate.py /api/
 COPY api/prediction_tracker.py /api/
+COPY api/llm_report_metrics.py /api/
+
+# LLM layer (assistant, prompt registry, trace logger). Path resolution in main.py expects /llm next to /api.
+COPY llm/assistant.py llm/prompt_registry.py llm/trace_logger.py llm/embeddings.py /llm/
+COPY llm/prompts/ /llm/prompts/
 
 # Copy monitoring components from training
 COPY training/metrics_collector.py /training/
@@ -60,7 +65,7 @@ COPY monitoring/drift_detector.py /monitoring/
 COPY api/static/ /api/static/
 
 # Create directories for models and logs
-RUN mkdir -p /models /logs/metrics /logs/predictions
+RUN mkdir -p /models /logs/metrics /logs/predictions /logs/llm_traces /monitoring/reports
 
 # Set working directory
 WORKDIR /api
